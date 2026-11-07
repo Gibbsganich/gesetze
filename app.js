@@ -1,5 +1,5 @@
 /*
-  Gesetzessammlung Web-App - Version 07.11.2026
+  Gesetzessammlung Web-App - Version 07.11.2026c
   Grundgerüst: Datenbank laden, einfache Suche, Liste, Anzeige der Vorschrift.
 
   Daten (aus LawWebExport.vb): Texts = Zeilen [Gesetz, Land, Paragraf, Nummer, Text, Html]
@@ -185,7 +185,7 @@ function RunSearch() {
   State.Words = Query.Words;
   if (Query.Empty) {
     State.Results = [];
-    El("ListInfo").textContent = "";
+    El("ListInfo").textContent = DataStand();
     El("ResultList").innerHTML = `<div class="Welcome">Suchbegriff eingeben, z.B. <b>baugb 35</b>, ` +
       `<b>baugb außenbereich</b> oder <b>§ 35 Abs. 1 BauGB</b>.</div>`;
     return;
@@ -291,9 +291,9 @@ function EscapeRegExp(Text) {
 // ======================================================================
 function ShowResults() {
   const Count = State.Results.length;
-  El("ListInfo").textContent = Count === 0 ? "Keine Treffer." :
-    Count > MaxResults ? `${Count.toLocaleString("de-DE")} Treffer – die ersten ${MaxResults} werden angezeigt.` :
-    `${Count.toLocaleString("de-DE")} Treffer`;
+  El("ListInfo").textContent = (Count === 0 ? "Keine Treffer" :
+    Count > MaxResults ? `${Count.toLocaleString("de-DE")} Treffer (erste ${MaxResults})` :
+    `${Count.toLocaleString("de-DE")} Treffer`) + " · " + DataStand();
 
   const Html = [];
   for (const Index of State.Results.slice(0, MaxResults)) {
@@ -307,6 +307,13 @@ function ShowResults() {
 
   // iPad: erste Vorschrift gleich anzeigen
   if (IsWide() && Count > 0) ShowText(State.Results[0], false);
+}
+
+// Stand der Daten, knapp: "Stand: 7.11.26"
+function DataStand() {
+  const Created = State.Data && State.Data.Created ? new Date(State.Data.Created) : null;
+  if (!Created || isNaN(Created)) return "";
+  return `Stand: ${Created.getDate()}.${Created.getMonth() + 1}.${String(Created.getFullYear()).slice(-2)}`;
 }
 
 function ResultList_Click(E) {
@@ -360,7 +367,7 @@ function ShowText(Index, OpenDetail) {
   State.CurrentIndex = Index;
   const Row = State.Texts[Index];
   El("DetailTitle").textContent = Row[ColParagraf];
-  El("DetailLaw").textContent = `${Row[ColGesetz]} – ${Row[ColLand]}`;
+  El("DetailLaw").textContent = `${Row[ColGesetz]} · ${Row[ColLand]}`;
   El("LawBody").innerHTML = Row[ColHtml];
   const FirstMark = Highlight(El("LawBody"), State.Words);
 
