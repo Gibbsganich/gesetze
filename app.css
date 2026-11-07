@@ -56,7 +56,7 @@ body {
 /* Als App vom Home-Bildschirm: iOS zeichnet unter der Statusleiste einen weichen Übergang.
    Etwas mehr Abstand nach oben, damit nur der leere Balken davon betroffen ist, nicht das Suchfeld. */
 @media (display-mode: standalone) {
-  #SearchBar { padding-top: calc(16px + env(safe-area-inset-top)); }
+  #SearchBar { padding-top: calc(26px + env(safe-area-inset-top)); }
 }
 
 #SearchBox {
@@ -192,6 +192,10 @@ body:not(.ShowDetail) #DetailPane { display: none; }
   font-size: 16px !important;
 }
 #LawBody table { display: block; overflow-x: auto; }   /* breite Tabellen seitlich scrollen */
+
+/* Leseansicht (iPad/PC einspaltig): alles im Text gleichmäßig vergrößert (Schrift, Einzüge, Abstände),
+   Zeilenumbruch wie in der Zweispaltenansicht. Faktor setzt app.js. */
+body.ReadingView #LawBody { zoom: var(--ReadingZoom, 1); }
 
 
 /* ---------- iPad/PC: zwei Spalten ---------- */

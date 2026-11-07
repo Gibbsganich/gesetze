@@ -1,5 +1,5 @@
 /*
-  Gesetzessammlung Web-App - Version 07.11.2026d
+  Gesetzessammlung Web-App - Version 07.11.2026e
   Grundgerüst: Datenbank laden, einfache Suche, Liste, Anzeige der Vorschrift.
 
   Daten (aus LawWebExport.vb): Texts = Zeilen [Gesetz, Land, Paragraf, Nummer, Text, Html]
@@ -50,6 +50,7 @@ window.addEventListener("load", async () => {
   El("MenuButton").addEventListener("click", () => ShowMenu(true));
   El("LayoutButton").addEventListener("click", LayoutButton_Click);
   WideScreen.addEventListener("change", ApplyLayout);   // iPad drehen, Split View, Fenstergröße
+  window.addEventListener("resize", ApplyLayout);        // Vergrößerung der Leseansicht anpassen
   ApplyLayout();
   El("CloseMenuButton").addEventListener("click", () => ShowMenu(false));
   El("FileInput").addEventListener("change", FileInput_Change);
@@ -341,14 +342,29 @@ function LayoutButton_Click() {
 
 function ApplyLayout() {
   const TwoColumns = WideScreen.matches && !SingleColumnChosen();
+
+  // Leseansicht (iPad/PC einspaltig): Text wie in der Zweispaltenansicht umbrechen, aber auf die volle Breite
+  // vergrößern – Faktor = volle Breite / Breite der rechten Spalte (Fensterbreite - 320px Liste)
+  const ReadingView = WideScreen.matches && !TwoColumns;
+  document.body.classList.toggle("ReadingView", ReadingView);
+  document.documentElement.style.setProperty("--ReadingZoom",
+    (window.innerWidth / Math.max(1, window.innerWidth - 320)).toFixed(3));
+
   if (TwoColumns === IsWide() && document.body.dataset.LayoutDone) return;
   document.body.dataset.LayoutDone = "1";
-  // Beim Wechsel: in der Einspaltenansicht mit der Liste beginnen
-  if (document.body.classList.contains("ShowDetail")) history.back();
-  document.body.classList.toggle("TwoColumns", TwoColumns);
   El("LayoutDivider").style.display = TwoColumns ? "" : "none";   // Symbol: mit Trennlinie = zweispaltig
   El("LayoutButton").title = TwoColumns ? "Einspaltige Ansicht" : "Zweispaltige Ansicht";
-  if (TwoColumns && State.CurrentIndex >= 0) ShowText(State.CurrentIndex, false);
+
+  if (TwoColumns) {
+    // zurück zu zwei Spalten: Vorschrift rechts
+    if (document.body.classList.contains("ShowDetail")) history.back();
+    document.body.classList.add("TwoColumns");
+    if (State.CurrentIndex >= 0) ShowText(State.CurrentIndex, false);
+  } else {
+    // eine Spalte: mit der angezeigten Vorschrift beginnen ("‹" führt zur Liste)
+    document.body.classList.remove("TwoColumns");
+    if (State.CurrentIndex >= 0) ShowText(State.CurrentIndex, true);
+  }
 }
 
 // PC-Tastatur: Pfeil hoch/runter blättert durch die Treffer (Bild hoch/runter um 10, Pos1/Ende)
