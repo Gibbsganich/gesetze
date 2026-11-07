@@ -8,7 +8,7 @@
 :root {
   --Background: #ffffff;
   --Bar: #f6f6f6;
-  --SubBar: #f9f9f9;           /* Trefferzeile und Überschrift: heller als die Suchzeile */
+  --SubBar: #fbfbfb;           /* Trefferzeile und Überschrift: heller als die Suchzeile */
   --Line: #d0d0d0;
   --Text: #000000;
   --Muted: #6b6b6b;

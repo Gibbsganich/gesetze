@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "9 (7.11.26)";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "10 (7.11.26)";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
