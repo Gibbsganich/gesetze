@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "11";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "12";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -198,9 +198,9 @@ function RunSearch() {
   if (Queries.length === 0) {
     State.Results = [];
     El("ListInfo").textContent = DataStand() + " · Version " + AppVersion;
-    El("ResultList").innerHTML = `<div class="Welcome">Suchbegriff eingeben, z.B. <b>baugb 35</b>, ` +
-      `<b>baugb außenbereich</b>, <b>§ 35 Abs. 1 BauGB</b>, <b>"schädliche Umwelteinwirkungen"</b> ` +
-      `oder <b>baugb 34 + 35</b>.</div>`;
+    El("ResultList").innerHTML = `<div class="Welcome">Suchbegriff eingeben, z.B.<ul>` +
+      `<li>baugb 35</li><li>baugb außenbereich</li><li>§ 35 Abs. 1 BauGB</li>` +
+      `<li>"schädliche Umwelteinwirkungen"</li><li>baugb 34 + 35</li></ul></div>`;
     return;
   }
   // Oder: Treffer aller Teile zusammenführen (jede Vorschrift einmal, in der Reihenfolge der Sammlung)

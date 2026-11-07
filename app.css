@@ -149,6 +149,8 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 .ItemParagraf { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .Welcome { padding: 16px; line-height: 1.5; }
+.Welcome ul { list-style: disc; margin: 6px 0 0 0; padding-left: 1.3em; }   /* gegen ul/li-Regeln aus LawHtml.Css */
+.Welcome li { margin: 2px 0; padding: 0; text-indent: 0; }
 
 
 /* ---------- Vorschrift ---------- */
