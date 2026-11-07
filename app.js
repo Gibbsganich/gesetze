@@ -1,5 +1,5 @@
 /*
-  Gesetzessammlung Web-App - Version 07.11.2026c
+  Gesetzessammlung Web-App - Version 07.11.2026d
   Grundgerüst: Datenbank laden, einfache Suche, Liste, Anzeige der Vorschrift.
 
   Daten (aus LawWebExport.vb): Texts = Zeilen [Gesetz, Land, Paragraf, Nummer, Text, Html]
@@ -25,7 +25,8 @@ const State = {
 };
 
 const El = id => document.getElementById(id);
-const IsWide = () => window.matchMedia("(min-width: 700px)").matches;
+const WideScreen = window.matchMedia("(min-width: 700px)");
+const IsWide = () => document.body.classList.contains("TwoColumns");
 
 
 // ======================================================================
@@ -47,6 +48,9 @@ window.addEventListener("load", async () => {
   El("PreviousButton").addEventListener("click", () => ShowText(State.CurrentIndex - 1, true));
   El("NextButton").addEventListener("click", () => ShowText(State.CurrentIndex + 1, true));
   El("MenuButton").addEventListener("click", () => ShowMenu(true));
+  El("LayoutButton").addEventListener("click", LayoutButton_Click);
+  WideScreen.addEventListener("change", ApplyLayout);   // iPad drehen, Split View, Fenstergröße
+  ApplyLayout();
   El("CloseMenuButton").addEventListener("click", () => ShowMenu(false));
   El("FileInput").addEventListener("change", FileInput_Change);
   window.addEventListener("popstate", () => document.body.classList.remove("ShowDetail"));
@@ -319,6 +323,32 @@ function DataStand() {
 function ResultList_Click(E) {
   const Item = E.target.closest(".Item");
   if (Item) ShowText(+Item.dataset.index, true);
+}
+
+// ======================================================================
+// Ein- oder zweispaltig
+//   Zwei Spalten nur auf breiten Bildschirmen und nur, wenn nicht mit dem Umschalter abgeschaltet.
+//   Die Wahl wird je Gerät gemerkt.
+// ======================================================================
+function SingleColumnChosen() {
+  try { return localStorage.getItem("SingleColumn") === "1"; } catch { return false; }
+}
+
+function LayoutButton_Click() {
+  try { localStorage.setItem("SingleColumn", SingleColumnChosen() ? "0" : "1"); } catch { }
+  ApplyLayout();
+}
+
+function ApplyLayout() {
+  const TwoColumns = WideScreen.matches && !SingleColumnChosen();
+  if (TwoColumns === IsWide() && document.body.dataset.LayoutDone) return;
+  document.body.dataset.LayoutDone = "1";
+  // Beim Wechsel: in der Einspaltenansicht mit der Liste beginnen
+  if (document.body.classList.contains("ShowDetail")) history.back();
+  document.body.classList.toggle("TwoColumns", TwoColumns);
+  El("LayoutDivider").style.display = TwoColumns ? "" : "none";   // Symbol: mit Trennlinie = zweispaltig
+  El("LayoutButton").title = TwoColumns ? "Einspaltige Ansicht" : "Zweispaltige Ansicht";
+  if (TwoColumns && State.CurrentIndex >= 0) ShowText(State.CurrentIndex, false);
 }
 
 // PC-Tastatur: Pfeil hoch/runter blättert durch die Treffer (Bild hoch/runter um 10, Pos1/Ende)

@@ -194,23 +194,28 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 #LawBody table { display: block; overflow-x: auto; }   /* breite Tabellen seitlich scrollen */
 
 
-/* ---------- iPad: zwei Spalten ---------- */
+/* ---------- iPad/PC: zwei Spalten ---------- */
+/* Die Klasse TwoColumns setzt app.js: breiter Bildschirm und Zweispaltenansicht nicht abgeschaltet */
+body.TwoColumns #ListPane {
+  display: flex !important;
+  width: 320px;
+  flex: none;
+  border-right: 1px solid var(--Line);
+}
+body.TwoColumns #DetailPane {
+  display: flex !important;
+  flex: 1;
+  min-width: 0;
+}
+body.TwoColumns #BackButton { display: none !important; }
+body.TwoColumns #PreviousButton, body.TwoColumns #NextButton { display: flex !important; }   /* immer sichtbar */
+body.TwoColumns #DetailHeader { padding-left: 14px; }
+body.TwoColumns #ListInfo:empty { display: flex; }   /* gleiche Höhe wie rechts, auch ohne Text */
+
+/* Umschalter ein-/zweispaltig: nur auf breiten Bildschirmen (iPad, PC) */
+#LayoutButton { display: none; }
 @media (min-width: 700px) {
-  #ListPane {
-    display: flex !important;
-    width: 320px;
-    flex: none;
-    border-right: 1px solid var(--Line);
-  }
-  #DetailPane {
-    display: flex !important;
-    flex: 1;
-    min-width: 0;
-  }
-  #BackButton { display: none !important; }
-  #PreviousButton, #NextButton { display: flex !important; }   /* iPad: immer sichtbar */
-  #DetailHeader { padding-left: 14px; }
-  #ListInfo:empty { display: flex; }   /* gleiche Höhe wie rechts, auch ohne Text */
+  #LayoutButton { display: flex; }
 }
 
 
