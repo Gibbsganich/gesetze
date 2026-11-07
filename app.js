@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "10 (7.11.26)";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "11";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -169,15 +169,18 @@ async function LoadFromStorage() {
 
 
 // ======================================================================
-// Suche (erste, einfache Fassung)
-//   "baugb"              ganzes Gesetz
-//   "baugb 35"           Nummer 35 (auch Teil 35, Anlage 35)
-//   "baugb 3-13"         Nummernbereich
-//   "baugb 3a"           genau "§ 3a"
-//   "lbo bw 5"           Gesetz mit Land
-//   "baugb außenbereich" Wort im Gesetz
-//   "außenbereich"       Volltext in allen Gesetzen (alle Wörter müssen vorkommen)
-//   "§ 35 Abs. 1 BauGB"  Zitat wird umgestellt
+// Suche
+//   "baugb"                     ganzes Gesetz
+//   "baugb 35"                  Nummer 35 (auch Teil 35, Anlage 35)
+//   "baugb 3-13"                Nummernbereich
+//   "baugb 3a"                  genau "§ 3a"
+//   "lbo bw 5"                  Gesetz mit Land
+//   "baugb außenbereich"        Wort im Gesetz
+//   "außenbereich"              Volltext in allen Gesetzen (alle Wörter müssen vorkommen)
+//   "§ 35 Abs. 1 BauGB"         Zitat wird umgestellt
+//   "\"schädliche Umwelt\""     Phrase: Wörter genau in dieser Reihenfolge
+//   "baugb 34 + 35"             Oder: Teile mit "+" oder " OR " getrennt; ein Teil ohne Gesetz
+//   "lärm OR geräusch"          gilt für das Gesetz des ersten Teils (hier: kein Gesetz = Volltext)
 // ======================================================================
 let SearchTimer = null;
 
@@ -190,23 +193,60 @@ function SearchBox_Input() {
 
 function RunSearch() {
   if (!State.Data) return;
-  const Query = ParseQuery(El("SearchBox").value);
-  State.Words = Query.Words;
-  if (Query.Empty) {
+  const Queries = ParseInput(El("SearchBox").value);
+  State.Words = [].concat(...Queries.map(Q => Q.Words));
+  if (Queries.length === 0) {
     State.Results = [];
-    El("ListInfo").textContent = DataStand();
+    El("ListInfo").textContent = DataStand() + " · Version " + AppVersion;
     El("ResultList").innerHTML = `<div class="Welcome">Suchbegriff eingeben, z.B. <b>baugb 35</b>, ` +
-      `<b>baugb außenbereich</b> oder <b>§ 35 Abs. 1 BauGB</b>.</div>`;
+      `<b>baugb außenbereich</b>, <b>§ 35 Abs. 1 BauGB</b>, <b>"schädliche Umwelteinwirkungen"</b> ` +
+      `oder <b>baugb 34 + 35</b>.</div>`;
     return;
   }
-  State.Results = FindTexts(Query);
+  // Oder: Treffer aller Teile zusammenführen (jede Vorschrift einmal, in der Reihenfolge der Sammlung)
+  const Found = new Set();
+  for (const Query of Queries) for (const Index of FindTexts(Query)) Found.add(Index);
+  State.Results = [...Found].sort((A, B) => A - B);
   ShowResults();
 }
 
-// Suchzeile in ihre Teile zerlegen
-function ParseQuery(Input) {
+// Suchzeile in Oder-Teile zerlegen; jeder Teil wird mit ParseQuery gelesen
+function ParseInput(Input) {
+  // Typografische Anführungszeichen (iPhone-Tastatur) wie normale behandeln
+  const Text = Input.replace(/[„“”«»]/g, '"').trim();
+  if (Text === "") return [];
+  // "+" und " OR " trennen – aber nicht innerhalb einer Phrase in "…"
+  const Parts = [];
+  let Current = "", InPhrase = false;
+  for (let I = 0; I < Text.length; I++) {
+    const C = Text[I];
+    if (C === '"') InPhrase = !InPhrase;
+    if (!InPhrase && C === "+") { Parts.push(Current); Current = ""; continue; }
+    if (!InPhrase && /^\sOR\s/.test(Text.substr(I, 4))) { Parts.push(Current); Current = ""; I += 2; continue; }
+    Current += C;
+  }
+  Parts.push(Current);
+
+  const Queries = [];
+  let FirstLaws = null;
+  for (const Part of Parts) {
+    const Query = ParseQuery(Part);
+    if (Query.Empty) continue;
+    // Teil ohne Gesetz übernimmt das Gesetz des ersten Teils ("baugb 34 + 35")
+    if (Queries.length === 0) FirstLaws = Query.Laws;
+    else if (!Query.Laws && FirstLaws) {
+      const WithLaw = ParseQuery(Part, FirstLaws);
+      Object.assign(Query, WithLaw);
+    }
+    Queries.push(Query);
+  }
+  return Queries;
+}
+
+// Einen Teil der Suchzeile zerlegen. Laws: Gesetz vorgeben (für Oder-Teile ohne eigenes Gesetz)
+function ParseQuery(Input, Laws) {
   let Text = Input.trim().replace(/\s+/g, " ");
-  const Query = { Empty: Text === "", Laws: null, NumberFrom: null, NumberTo: null, Label: null, Words: [] };
+  const Query = { Empty: Text === "" || Text === '"', Laws: null, NumberFrom: null, NumberTo: null, Label: null, Words: [] };
   if (Query.Empty) return Query;
 
   // Zitat umstellen: "§ 35 Abs. 1 Satz 2 BauGB" -> "BauGB 35"; "§ 1 16. BImSchV" -> "16. BImSchV 1"
@@ -222,22 +262,35 @@ function ParseQuery(Input) {
     }
   }
 
-  let Tokens = Text.split(" ");
+  // Wörter und Phrasen ("…" bleibt ein Suchbegriff)
+  let Tokens = [];
+  for (const Match of Text.matchAll(/"([^"]*)"?|(\S+)/g)) {
+    if (Match[1] !== undefined) {
+      if (Match[1].trim() !== "") Tokens.push({ Text: Match[1].trim(), Phrase: true });
+    } else {
+      Tokens.push({ Text: Match[2], Phrase: false });
+    }
+  }
+  const Plain = Count => Tokens.length >= Count && Tokens.slice(0, Count).every(T => !T.Phrase);
 
   // Gesetz: erst zwei Wörter ("16. BImSchV"), dann ein Wort
-  for (const Length of [2, 1]) {
-    if (Tokens.length < Length) continue;
-    const Key = Tokens.slice(0, Length).join(" ").toLowerCase();
-    if (State.LawKeys.has(Key)) {
-      Query.Laws = State.LawKeys.get(Key);
-      Tokens = Tokens.slice(Length);
-      break;
+  if (Laws) {
+    Query.Laws = Laws;
+  } else {
+    for (const Length of [2, 1]) {
+      if (!Plain(Length)) continue;
+      const Key = Tokens.slice(0, Length).map(T => T.Text).join(" ").toLowerCase();
+      if (State.LawKeys.has(Key)) {
+        Query.Laws = State.LawKeys.get(Key);
+        Tokens = Tokens.slice(Length);
+        break;
+      }
     }
   }
 
   // Land nach dem Gesetz ("LBO BW")
-  if (Query.Laws && Tokens.length > 0) {
-    const Land = Tokens[0].toLowerCase();
+  if (Query.Laws && !Laws && Plain(1)) {
+    const Land = Tokens[0].Text.toLowerCase();
     const WithLand = Query.Laws.filter(L => L.Land.toLowerCase() === Land);
     if (WithLand.length > 0) {
       Query.Laws = WithLand;
@@ -246,29 +299,30 @@ function ParseQuery(Input) {
   }
 
   // Nummer nach dem Gesetz: "35", "3-13", "3a"
-  if (Query.Laws && Tokens.length > 0) {
+  if (Query.Laws && Plain(1)) {
+    const First = Tokens[0].Text;
     let Match;
-    if ((Match = Tokens[0].match(/^(\d+)-(\d+)$/))) {
+    if ((Match = First.match(/^(\d+)-(\d+)$/))) {
       Query.NumberFrom = +Match[1];
       Query.NumberTo = +Match[2];
       Tokens = Tokens.slice(1);
-    } else if ((Match = Tokens[0].match(/^\d+$/))) {
+    } else if ((Match = First.match(/^\d+$/))) {
       Query.NumberFrom = Query.NumberTo = +Match[0];
       Tokens = Tokens.slice(1);
-    } else if ((Match = Tokens[0].match(/^\d+[a-z]$/i))) {
+    } else if ((Match = First.match(/^\d+[a-z]$/i))) {
       Query.Label = Match[0].toLowerCase();
       Tokens = Tokens.slice(1);
     }
   }
 
-  // Rest: Wörter (Platzhalter * wird ignoriert)
-  Query.Words = Tokens.map(T => T.replace(/\*/g, "")).filter(T => T !== "");
+  // Rest: Wörter und Phrasen (Platzhalter * wird ignoriert)
+  Query.Words = Tokens.map(T => T.Text.replace(/\*/g, "")).filter(T => T !== "");
   return Query;
 }
 
 // Treffer suchen: Indizes der passenden Zeilen
 function FindTexts(Query) {
-  const Patterns = Query.Words.map(W => new RegExp(EscapeRegExp(W), "i"));
+  const Patterns = Query.Words.map(W => new RegExp(WordPattern(W), "i"));
   const LabelPattern = Query.Label ? new RegExp("^\\S+\\s+" + EscapeRegExp(Query.Label) + "\\b", "i") : null;
   const Results = [];
 
@@ -288,6 +342,11 @@ function FindTexts(Query) {
     for (let I = 0; I < State.Texts.length; I++) Check(I);
   }
   return Results;
+}
+
+// Suchmuster für ein Wort oder eine Phrase: zwischen den Wörtern einer Phrase beliebiger Leerraum (auch Zeilenwechsel)
+function WordPattern(Word) {
+  return Word.split(/\s+/).map(EscapeRegExp).join("\\s+");
 }
 
 function EscapeRegExp(Text) {
@@ -452,7 +511,7 @@ function SameLaw(IndexA, IndexB) {
 function Highlight(Root, Words) {
   const Clean = Words.filter(W => W.length > 1);
   if (Clean.length === 0) return null;
-  const Pattern = new RegExp(Clean.map(EscapeRegExp).join("|"), "gi");
+  const Pattern = new RegExp(Clean.map(WordPattern).join("|"), "gi");
   const Walker = document.createTreeWalker(Root, NodeFilter.SHOW_TEXT);
   const Nodes = [];
   while (Walker.nextNode()) Nodes.push(Walker.currentNode);
