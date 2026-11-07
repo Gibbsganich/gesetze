@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <!-- Gesetzessammlung Web-App - Version 07.11.2026 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Gesetze">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f6f6f6">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <title>Gesetzessammlung</title>
+  <link rel="stylesheet" href="app.css">
+  <!-- Stylesheet für das Mini-HTML: kommt aus der Datendatei (LawHtml.Css) -->
+  <style id="LawCss"></style>
+</head>
+<body>
+
+  <!-- Oben: Suchzeile (immer sichtbar) -->
+  <header id="SearchBar">
+    <input id="SearchBox" type="search" placeholder="z.B. baugb 35, § 35 Abs. 1 BauGB, außenbereich"
+           autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+    <button id="MenuButton" type="button" title="Datenbank">⋯</button>
+  </header>
+
+  <main id="MainArea">
+
+    <!-- Links (iPad) bzw. erste Ansicht (iPhone): Ergebnisliste -->
+    <section id="ListPane">
+      <div id="ListInfo"></div>
+      <div id="ResultList" tabindex="0"></div>
+    </section>
+
+    <!-- Rechts (iPad) bzw. zweite Ansicht (iPhone): Vorschrift -->
+    <section id="DetailPane">
+      <div id="DetailHeader">
+        <button id="BackButton" type="button" title="Zurück zur Liste">‹</button>
+        <div id="DetailTitle"></div>
+        <div id="DetailLaw"></div>
+        <button id="PreviousButton" type="button" title="Vorherige Vorschrift">▲</button>
+        <button id="NextButton" type="button" title="Nächste Vorschrift">▼</button>
+      </div>
+      <div id="DetailScroll">
+        <div id="LawBody"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Datenbank laden / Info -->
+  <div id="MenuPanel" hidden>
+    <div id="MenuBox">
+      <h2>Datenbank</h2>
+      <p id="DataInfo">Noch keine Daten geladen.</p>
+      <label id="LoadLabel" class="BigButton">
+        Datenbank laden …
+        <input id="FileInput" type="file" hidden>
+      </label>
+      <p class="Hint">Datei <b>Gesetzessammlung_Web.json.gz</b> auswählen (z.B. aus iCloud Drive oder OneDrive).
+        Die Daten werden nur auf diesem Gerät gespeichert.</p>
+      <button id="CloseMenuButton" type="button" class="BigButton Secondary">Schließen</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

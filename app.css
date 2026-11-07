@@ -1,0 +1,243 @@
+/*
+  Gesetzessammlung Web-App - Version 07.11.2026
+  Layout: oben Suchzeile; darunter
+    - schmal (iPhone):  eine Spalte – entweder Liste oder Vorschrift (Klasse ShowDetail am body)
+    - breit (iPad):     zwei Spalten – links Liste, rechts Vorschrift
+*/
+
+:root {
+  --Background: #ffffff;
+  --Bar: #f6f6f6;
+  --Line: #d0d0d0;
+  --Text: #000000;
+  --Muted: #6b6b6b;
+  --Selected: #dbe8fb;
+  --Accent: #0a64d8;
+  --HeaderHeight: 47px;       /* Trefferzeile links = Überschriftzeile rechts (inkl. 1px Linie) */
+  --ButtonSize: 34px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--Background);
+  color: var(--Text);
+  font-family: -apple-system, system-ui, "Segoe UI", Arial, sans-serif;
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+
+/* ---------- Suchzeile ---------- */
+#SearchBar {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  padding-left: calc(12px + env(safe-area-inset-left));
+  padding-right: calc(12px + env(safe-area-inset-right));
+  background: var(--Bar);
+  border-bottom: 1px solid var(--Line);
+}
+
+#SearchBox {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;            /* ab 16px vergrößert iOS beim Tippen nicht die Seite */
+  padding: 8px 10px;
+  border: 1px solid var(--Line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+#MenuButton {
+  flex: none;
+  width: 42px;
+  font-size: 20px;
+  border: 1px solid var(--Line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+
+/* ---------- Inhalt ---------- */
+#MainArea {
+  flex: 1;
+  display: flex;
+  min-height: 0;              /* damit die Bereiche selbst scrollen */
+}
+
+#ListPane, #DetailPane {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* iPhone: entweder Liste oder Vorschrift */
+body.ShowDetail #ListPane { display: none; }
+body:not(.ShowDetail) #DetailPane { display: none; }
+
+
+/* ---------- Liste ---------- */
+#ListInfo {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--HeaderHeight);
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--Muted);
+  border-bottom: 1px solid var(--Line);
+}
+#ListInfo:empty { display: none; }
+
+#ResultList:focus { outline: none; }
+
+#ResultList {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.Item {
+  padding: 8px 12px;
+  padding-left: calc(12px + env(safe-area-inset-left));
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+.Item.Selected { background: var(--Selected); }
+.ItemLaw { font-size: 13px; color: var(--Muted); }
+.ItemParagraf { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.Welcome { padding: 16px; line-height: 1.5; }
+
+
+/* ---------- Vorschrift ---------- */
+/* Abstand der Tasten nach rechts = Abstand nach oben/unten: (47 - 1 Linie - 34) / 2 = 6px */
+#DetailHeader {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--HeaderHeight);
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--Line);
+  background: var(--Background);
+}
+
+/* links die Überschrift, rechts Gesetz – Land */
+#DetailTitle {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#DetailLaw {
+  flex: none;
+  max-width: 40%;
+  margin: 0 4px;
+  color: var(--Muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#DetailHeader button {
+  flex: none;
+  width: var(--ButtonSize);
+  height: var(--ButtonSize);
+  padding: 0;
+  font-size: 15px;
+  border: 1px solid var(--Line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--Accent);
+}
+#DetailHeader button:disabled { color: #c0c0c0; }
+#BackButton { font-size: 22px !important; line-height: 1; }
+
+#DetailScroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Schrift des Mini-HTML: auf iPhone/iPad Systemschrift statt Segoe UI (Rest aus LawHtml.Css) */
+#LawBody {
+  font-family: -apple-system, system-ui, "Segoe UI", Arial, sans-serif !important;
+  font-size: 16px !important;
+}
+#LawBody table { display: block; overflow-x: auto; }   /* breite Tabellen seitlich scrollen */
+
+
+/* ---------- iPad: zwei Spalten ---------- */
+@media (min-width: 700px) {
+  #ListPane {
+    display: flex !important;
+    width: 320px;
+    flex: none;
+    border-right: 1px solid var(--Line);
+  }
+  #DetailPane {
+    display: flex !important;
+    flex: 1;
+    min-width: 0;
+  }
+  #BackButton { display: none; }
+  #DetailHeader { padding-left: 14px; }
+  #ListInfo:empty { display: flex; }   /* gleiche Höhe wie rechts, auch ohne Text */
+}
+
+
+/* ---------- Datenbank-Fenster ---------- */
+#MenuPanel {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+#MenuPanel[hidden] { display: none; }
+
+#MenuBox {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+#MenuBox h2 { margin: 0 0 8px 0; font-size: 19px; }
+.Hint { font-size: 13px; color: var(--Muted); }
+
+.BigButton {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 11px;
+  margin: 10px 0;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--Accent);
+  color: #fff;
+  cursor: pointer;
+}
+.BigButton.Secondary { background: #e9e9e9; color: #000; }
