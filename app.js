@@ -1,5 +1,5 @@
 /*
-  Gesetzessammlung Web-App - Version 07.11.2026e
+  Gesetzessammlung Web-App - Version 07.11.2026f
   Grundgerüst: Datenbank laden, einfache Suche, Liste, Anzeige der Vorschrift.
 
   Daten (aus LawWebExport.vb): Texts = Zeilen [Gesetz, Land, Paragraf, Nummer, Text, Html]
@@ -120,7 +120,9 @@ function ApplyData(Data) {
   });
 
   // Stylesheet der Windows-App; "body" wird zum Anzeigebereich #LawBody
-  El("LawCss").textContent = (Data.Css || "").replace(/\bbody\b/g, "#LawBody");
+  // Einzüge in cm werden zu em (bezogen auf 16px), damit sie in der Leseansicht mit der Schrift wachsen
+  El("LawCss").textContent = (Data.Css || "").replace(/\bbody\b/g, "#LawBody")
+    .replace(/(\d+(?:\.\d+)?)cm\b/g, (Match, Value) => (Value * 37.795 / 16).toFixed(3) + "em");
 
   const Created = Data.Created ? new Date(Data.Created).toLocaleString("de-DE") : "unbekannt";
   El("DataInfo").textContent = `${State.Texts.length.toLocaleString("de-DE")} Vorschriften aus ` +

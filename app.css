@@ -193,9 +193,9 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 }
 #LawBody table { display: block; overflow-x: auto; }   /* breite Tabellen seitlich scrollen */
 
-/* Leseansicht (iPad/PC einspaltig): alles im Text gleichmäßig vergrößert (Schrift, Einzüge, Abstände),
-   Zeilenumbruch wie in der Zweispaltenansicht. Faktor setzt app.js. */
-body.ReadingView #LawBody { zoom: var(--ReadingZoom, 1); }
+/* Leseansicht (iPad/PC einspaltig): größere Schrift; Abstände und Einzüge sind in em und wachsen mit,
+   der Zeilenumbruch bleibt wie in der Zweispaltenansicht. Faktor setzt app.js. */
+body.ReadingView #LawBody { font-size: calc(16px * var(--ReadingZoom, 1)) !important; }
 
 
 /* ---------- iPad/PC: zwei Spalten ---------- */
