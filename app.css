@@ -14,7 +14,7 @@
   --Selected: #dbe8fb;
   --Accent: #0a64d8;
   --HeaderHeight: 47px;       /* Trefferzeile links = Überschriftzeile rechts (inkl. 1px Linie) */
-  --ButtonSize: 34px;
+  --ButtonSize: 36px;
 }
 
 * { box-sizing: border-box; }
@@ -38,37 +38,61 @@ body {
 }
 
 
-/* ---------- Suchzeile ---------- */
+/* ---------- Suchzeile mit Tasten ----------
+   Reihenfolge: [‹] Suchfeld [▲] [▼] [Laden]; Abstand am Rand = Abstand oben/unten (8px) */
 #SearchBar {
   flex: none;
   display: flex;
-  gap: 8px;
-  padding: 8px 12px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
   padding-top: calc(8px + env(safe-area-inset-top));
-  padding-left: calc(12px + env(safe-area-inset-left));
-  padding-right: calc(12px + env(safe-area-inset-right));
+  padding-left: calc(8px + env(safe-area-inset-left));
+  padding-right: calc(8px + env(safe-area-inset-right));
   background: var(--Bar);
   border-bottom: 1px solid var(--Line);
+}
+
+/* Als App vom Home-Bildschirm: iOS zeichnet unter der Statusleiste einen weichen Übergang.
+   Etwas mehr Abstand nach oben, damit nur der leere Balken davon betroffen ist, nicht das Suchfeld. */
+@media (display-mode: standalone) {
+  #SearchBar { padding-top: calc(16px + env(safe-area-inset-top)); }
 }
 
 #SearchBox {
   flex: 1;
   min-width: 0;
+  height: var(--ButtonSize);
   font-size: 16px;            /* ab 16px vergrößert iOS beim Tippen nicht die Seite */
-  padding: 8px 10px;
+  padding: 0 10px;
   border: 1px solid var(--Line);
   border-radius: 8px;
   background: #fff;
 }
 
-#MenuButton {
+.BarButton {
   flex: none;
-  width: 42px;
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ButtonSize);
+  height: var(--ButtonSize);
+  padding: 0;
+  font-size: 15px;
   border: 1px solid var(--Line);
   border-radius: 8px;
   background: #fff;
+  color: var(--Accent);
+  cursor: pointer;
 }
+.BarButton:disabled { color: #c0c0c0; cursor: default; }
+.BarButton svg { width: 20px; height: 20px; }
+#BackButton { font-size: 24px; line-height: 1; padding-bottom: 3px; }
+
+/* iPhone, Liste: Zurück und Blättern ausblenden (nichts angezeigt) */
+body:not(.ShowDetail) #BackButton,
+body:not(.ShowDetail) #PreviousButton,
+body:not(.ShowDetail) #NextButton { display: none; }
 
 
 /* ---------- Inhalt ---------- */
@@ -126,14 +150,13 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 
 
 /* ---------- Vorschrift ---------- */
-/* Abstand der Tasten nach rechts = Abstand nach oben/unten: (47 - 1 Linie - 34) / 2 = 6px */
 #DetailHeader {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: var(--HeaderHeight);
-  padding: 0 6px 0 12px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--Line);
   background: var(--Background);
 }
@@ -150,26 +173,11 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 #DetailLaw {
   flex: none;
   max-width: 40%;
-  margin: 0 4px;
   color: var(--Muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-#DetailHeader button {
-  flex: none;
-  width: var(--ButtonSize);
-  height: var(--ButtonSize);
-  padding: 0;
-  font-size: 15px;
-  border: 1px solid var(--Line);
-  border-radius: 6px;
-  background: #fff;
-  color: var(--Accent);
-}
-#DetailHeader button:disabled { color: #c0c0c0; }
-#BackButton { font-size: 22px !important; line-height: 1; }
 
 #DetailScroll {
   flex: 1;
@@ -199,7 +207,8 @@ body:not(.ShowDetail) #DetailPane { display: none; }
     flex: 1;
     min-width: 0;
   }
-  #BackButton { display: none; }
+  #BackButton { display: none !important; }
+  #PreviousButton, #NextButton { display: flex !important; }   /* iPad: immer sichtbar */
   #DetailHeader { padding-left: 14px; }
   #ListInfo:empty { display: flex; }   /* gleiche Höhe wie rechts, auch ohne Text */
 }
