@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "17";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "18";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -197,6 +197,7 @@ function RunSearch() {
   State.Words = [].concat(...Queries.map(Q => Q.Words));
   if (Queries.length === 0) {
     State.Results = [];
+    ClearText();                                  // Detailbereich leeren
     El("ListInfo").textContent = DataStand() + " · Version " + AppVersion;
     El("ResultList").innerHTML = `<div class="Welcome">Suchbegriff eingeben, z.B.<ul>` +
       `<li>baugb 35</li><li>baugb 30-35</li><li>baugb außenbereich</li><li>§ 35 Abs. 1 BauGB</li>` +
