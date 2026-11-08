@@ -60,16 +60,21 @@ body {
   #SearchBar { padding-top: calc(26px + env(safe-area-inset-top)); }
 }
 
+/* Suchfeld: 20% höher als die Tasten, Ränder halbkreisförmig, dünne blaue Linie im Blau der Tasten */
 #SearchBox {
   flex: 1;
   min-width: 0;
-  height: var(--ButtonSize);
-  font-size: 16px;            /* ab 16px vergrößert iOS beim Tippen nicht die Seite */
-  padding: 0 10px;
-  border: 1px solid var(--Line);
-  border-radius: 8px;
+  height: calc(var(--ButtonSize) * 1.2);
+  font-size: 18px;            /* ab 16px vergrößert iOS beim Tippen nicht die Seite */
+  padding: 0 16px;
+  border: 1px solid var(--Accent);
+  border-radius: 999px;       /* halbkreisförmige Enden */
   background: #fff;
+  outline: none;
+  -webkit-appearance: none;   /* Safari: eigene Form statt Standard-Suchfeld */
+  appearance: none;
 }
+#SearchBox:focus { box-shadow: 0 0 0 2px rgba(10, 100, 216, 0.15); }
 
 .BarButton {
   flex: none;
@@ -80,13 +85,15 @@ body {
   height: var(--ButtonSize);
   padding: 0;
   font-size: 15px;
-  border: 1px solid var(--Line);
+  border: none;               /* flach wie auf dem iPhone: nur das Symbol */
   border-radius: 8px;
-  background: #fff;
+  background: transparent;
   color: var(--Accent);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.BarButton:disabled { color: #c0c0c0; cursor: default; }
+.BarButton:active { opacity: 0.4; }   /* kurze Rückmeldung beim Antippen */
+.BarButton:disabled { color: #c0c0c0; cursor: default; opacity: 1; }
 .BarButton svg { width: 20px; height: 20px; }
 #BackButton { font-size: 24px; line-height: 1; padding-bottom: 3px; }
 
