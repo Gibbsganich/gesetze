@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "26";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "27";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -222,7 +222,7 @@ function RunSearch() {
     El("ListInfo").textContent = DataStand() + " · Version " + AppVersion;
     El("ResultList").innerHTML = `<div class="Welcome">Suchbegriff eingeben, z.B.<ul>` +
       `<li>baugb 35</li><li>baugb 30-35</li><li>baugb außenbereich</li><li>§ 35 Abs. 1 BauGB</li>` +
-      `<li>"schädliche Umwelteinwirkungen"</li><li>baugb 34 + 35</li></ul>` +
+      `<li>baugb 34 + baunvo 11</li><li>bund gewässer</li><li>"schädliche Umwelteinwirkungen"</li></ul>` +
       `<p>Suchbegriffe wie baugb 35 oder § 35 baugb werden nur als Gesetze und Paragrafen gesucht, nicht im Volltext. ` +
       `Suchbegriffe in Anführungszeichen werden nur im Volltext gesucht, auch wenn es sich um Gesetze handelt.</p>` +
       `<p>? im Suchfeld zeigt eine Liste der in der Gesetzessammlung enthaltenen Gesetze.</p>` +
@@ -254,15 +254,20 @@ function ParseInput(Input) {
   Parts.push(Current);
 
   const Queries = [];
-  let FirstLaws = null;
+  let FirstLaws = null, FirstLand = null;
   for (const Part of Parts) {
     const Query = ParseQuery(Part);
     if (Query.Empty) continue;
     // Teil ohne Gesetz übernimmt das Gesetz des ersten Teils ("baugb 34 + 35")
-    if (Queries.length === 0) FirstLaws = Query.Laws;
-    else if (!Query.Laws && FirstLaws) {
+    if (Queries.length === 0) {
+      FirstLaws = Query.Laws;
+      FirstLand = Query.Land;
+    } else if (!Query.Laws && FirstLaws) {
       const WithLaw = ParseQuery(Part, FirstLaws);
       Object.assign(Query, WithLaw);
+    } else if (!Query.Laws && !Query.Land && FirstLand) {
+      // Teil ohne Gesetz und Land übernimmt das Land des ersten Teils ("bw lärm + geräusch")
+      Query.Land = FirstLand;
     }
     Queries.push(Query);
   }
@@ -272,7 +277,7 @@ function ParseInput(Input) {
 // Einen Teil der Suchzeile zerlegen. Laws: Gesetz vorgeben (für Oder-Teile ohne eigenes Gesetz)
 function ParseQuery(Input, Laws) {
   let Text = Input.trim().replace(/\s+/g, " ");
-  const Query = { Empty: Text === "" || Text === '"', Laws: null, NumberFrom: null, NumberTo: null, Label: null, Words: [] };
+  const Query = { Empty: Text === "" || Text === '"', Laws: null, Land: null, NumberFrom: null, NumberTo: null, Label: null, Words: [] };
   if (Query.Empty) return Query;
 
   // Zitat umstellen: "§ 35 Abs. 1 Satz 2 BauGB" -> "BauGB 35"; "§ 1 16. BImSchV" -> "16. BImSchV 1"
@@ -308,6 +313,16 @@ function ParseQuery(Input, Laws) {
   }
   const Plain = Count => Tokens.length >= Count && Tokens.slice(0, Count).every(T => !T.Phrase);
 
+  // Land am Anfang ("bw baugenehmigung", "EU Wasserkörper"): nur in Gesetzen dieses Landes suchen.
+  // Nicht in Anführungszeichen, nicht allein und nicht, wenn das Wort selbst ein Gesetz ist.
+  if (!Laws && Plain(1) && Tokens.length > 1 && !State.LawKeys.has(Tokens[0].Text.toLowerCase())) {
+    const Land = FindLand(Tokens[0].Text);
+    if (Land) {
+      Query.Land = Land;
+      Tokens = Tokens.slice(1);
+    }
+  }
+
   // Gesetz: erst zwei Wörter ("16. BImSchV"), dann ein Wort
   if (Laws) {
     Query.Laws = Laws;
@@ -337,6 +352,9 @@ function ParseQuery(Input, Laws) {
       }
     }
   }
+
+  // Land vor dem Gesetz ("bw lbo 5"): nur das Gesetz dieses Landes
+  if (Query.Land && Query.Laws && !Laws) Query.Laws = Query.Laws.filter(L => L.Land === Query.Land);
 
   // Land nach dem Gesetz ("LBO BW")
   if (Query.Laws && !Laws && Plain(1)) {
@@ -378,6 +396,7 @@ function FindTexts(Query) {
 
   const Check = Index => {
     const Row = State.Texts[Index];
+    if (Query.Land && Row[ColLand] !== Query.Land) return;
     if (Query.NumberFrom !== null && (Row[ColNummer] < Query.NumberFrom || Row[ColNummer] > Query.NumberTo)) return;
     if (LabelPattern && !LabelPattern.test(Row[ColParagraf])) return;
     for (const Pattern of Patterns) {
@@ -397,6 +416,15 @@ function FindTexts(Query) {
 // Suchmuster für ein Wort oder eine Phrase: zwischen den Wörtern einer Phrase beliebiger Leerraum (auch Zeilenwechsel)
 function WordPattern(Word) {
   return Word.split(/\s+/).map(EscapeRegExp).join("\\s+");
+}
+
+// Land der Sammlung zu einem Kürzel ("bw" -> "BW", "bund" -> "Bund"); null, wenn unbekannt
+function FindLand(Text) {
+  const Key = Text.toLowerCase();
+  for (const List of State.LawKeys.values()) {
+    for (const Law of List) if (Law.Land.toLowerCase() === Key) return Law.Land;
+  }
+  return null;
 }
 
 // Sieht aus wie eine Gesetzesabkürzung: enthält Buchstaben, keine Satzzeichen außer Punkt/Bindestrich
