@@ -189,7 +189,19 @@ body:not(.ShowDetail) #DetailPane { display: none; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;            /* anklickbar: ganzes Gesetz anzeigen */
 }
+#DetailLaw:hover { text-decoration: underline; }
+
+/* Ganzes Gesetz: Überschrift jeder Vorschrift (antippbar) */
+#LawBody .WholeHeading {
+  font-weight: 600;
+  margin: 1.6em 0 0.5em 0;
+  padding-top: 0.6em;
+  border-top: 1px solid #e4e4e4;
+  cursor: pointer;
+}
+#LawBody .WholeHeading:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 
 #DetailScroll {
   flex: 1;

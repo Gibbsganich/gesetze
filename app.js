@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "25";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "26";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -22,6 +22,8 @@ const State = {
   LawKeys: new Map(),              // "baugb" -> [{ Gesetz, Land, First, Last }]  (Gesetz klein geschrieben)
   Results: [],                     // Indizes in Texts
   CurrentIndex: -1,                // angezeigte Vorschrift
+  WholeLaw: false,                 // true = ganzes Gesetz als Fließtext angezeigt
+  LawListMode: false,              // true = Liste der Gesetze ("?"): Auswahl zeigt das ganze Gesetz
   Words: []                        // Suchwörter für die Markierung
 };
 
@@ -48,6 +50,8 @@ window.addEventListener("load", async () => {
   El("BackButton").addEventListener("click", () => history.back());
   El("PreviousButton").addEventListener("click", () => ShowText(State.CurrentIndex - 1, true));
   El("NextButton").addEventListener("click", () => ShowText(State.CurrentIndex + 1, true));
+  El("DetailLaw").addEventListener("click", DetailLaw_Click);
+  El("LawBody").addEventListener("click", LawBody_Click);
   El("MenuButton").addEventListener("click", () => ShowMenu(true));
   El("LayoutButton").addEventListener("click", LayoutButton_Click);
   WideScreen.addEventListener("change", ApplyLayout);   // iPad drehen, Split View, Fenstergröße
@@ -195,6 +199,7 @@ function SearchBox_Input() {
 // Titelzeilen (erste Zeile jedes Gesetzes, Nummer 0) = je Gesetz eine Zeile, sortiert nach Land, dann Gesetz.
 // Über die erste Zeile statt nur über Nummer 0, damit kein Gesetz doppelt oder gar nicht erscheint.
 function ShowLawList() {
+  State.LawListMode = true;
   State.Words = [];
   State.Results = [];
   State.LawKeys.forEach(List => List.forEach(Law => State.Results.push(Law.First)));
@@ -207,6 +212,7 @@ function ShowLawList() {
 
 function RunSearch() {
   if (!State.Data) return;
+  State.LawListMode = false;
   if (El("SearchBox").value.trim() === "?") { ShowLawList(); return; }
   const Queries = ParseInput(El("SearchBox").value);
   State.Words = [].concat(...Queries.map(Q => Q.Words));
@@ -430,7 +436,7 @@ function ShowResults() {
 
   // iPad: erste Vorschrift gleich anzeigen; ohne Treffer den Detailbereich leeren
   if (Count === 0) ClearText();
-  else if (IsWide()) ShowText(State.Results[0], false);
+  else if (IsWide()) ShowItem(State.Results[0], false);
 }
 
 // Stand der Daten, knapp: "Stand: 7.11.26"
@@ -440,9 +446,15 @@ function DataStand() {
   return `Stand: ${Created.getDate()}.${Created.getMonth() + 1}.${String(Created.getFullYear()).slice(-2)}`;
 }
 
+// Eintrag der Liste anzeigen: in der Liste der Gesetze ("?") gleich das ganze Gesetz, sonst die Vorschrift
+function ShowItem(Index, OpenDetail) {
+  ShowText(Index, OpenDetail);
+  if (State.LawListMode) ShowWholeLaw(Index);
+}
+
 function ResultList_Click(E) {
   const Item = E.target.closest(".Item");
-  if (Item) ShowText(+Item.dataset.index, true);
+  if (Item) ShowItem(+Item.dataset.index, true);
 }
 
 // ======================================================================
@@ -461,6 +473,9 @@ function LayoutButton_Click() {
 
 function ApplyLayout() {
   const TwoColumns = WideScreen.matches && !SingleColumnChosen();
+  const ModeChanges = TwoColumns !== IsWide() || !document.body.dataset.LayoutDone;
+  // Ganzes Gesetz: Vorschrift merken, die gerade oben steht, um nach dem Umschalten wieder dorthin zu springen
+  const Anchor = ModeChanges && State.WholeLaw ? TopHeading() : null;
 
   // Leseansicht (iPad/PC einspaltig): Text wie in der Zweispaltenansicht umbrechen, aber auf die volle Breite
   // vergrößern – Faktor = volle Breite / Breite der rechten Spalte (Fensterbreite - 320px Liste)
@@ -474,16 +489,31 @@ function ApplyLayout() {
   El("LayoutDivider").style.display = TwoColumns ? "" : "none";   // Symbol: mit Trennlinie = zweispaltig
   El("LayoutButton").title = TwoColumns ? "Einspaltige Ansicht" : "Zweispaltige Ansicht";
 
+  // Nur das Spaltenlayout ändern; der Inhalt des Detailbereichs (Vorschrift oder ganzes Gesetz) bleibt stehen
   if (TwoColumns) {
     // zurück zu zwei Spalten: Vorschrift rechts
     if (document.body.classList.contains("ShowDetail")) history.back();
     document.body.classList.add("TwoColumns");
-    if (State.CurrentIndex >= 0) ShowText(State.CurrentIndex, false);
   } else {
     // eine Spalte: mit der angezeigten Vorschrift beginnen ("‹" führt zur Liste)
     document.body.classList.remove("TwoColumns");
-    if (State.CurrentIndex >= 0) ShowText(State.CurrentIndex, true);
+    if (State.CurrentIndex >= 0 && !document.body.classList.contains("ShowDetail")) {
+      history.pushState({ Detail: true }, "");
+      document.body.classList.add("ShowDetail");
+    }
   }
+  if (Anchor) Anchor.scrollIntoView({ block: "start" });
+}
+
+// Ganzes Gesetz: erste Paragrafenüberschrift, die im sichtbaren Bereich oben steht
+function TopHeading() {
+  const Top = El("DetailScroll").getBoundingClientRect().top;
+  let Last = null;
+  for (const Heading of El("LawBody").querySelectorAll(".WholeHeading")) {
+    if (Heading.getBoundingClientRect().top > Top + 5) return Last || Heading;
+    Last = Heading;
+  }
+  return Last;
 }
 
 // PC-Tastatur: Pfeil hoch/runter blättert durch die Treffer (Bild hoch/runter um 10, Pos1/Ende)
@@ -509,7 +539,7 @@ function MoveSelection(Step) {
   const Position = State.Results.indexOf(State.CurrentIndex);
   let NewPosition = Position < 0 ? 0 : Position + Step;
   NewPosition = Math.max(0, Math.min(Shown - 1, NewPosition));
-  ShowText(State.Results[NewPosition], false);
+  ShowItem(State.Results[NewPosition], false);
 }
 
 function ShowWelcome(Message, WithButton) {
@@ -530,6 +560,8 @@ function ShowText(Index, OpenDetail) {
   if (Index < 0 || Index >= State.Texts.length) return;
 
   State.CurrentIndex = Index;
+  State.WholeLaw = false;
+  El("DetailLaw").classList.remove("Active");
   const Row = State.Texts[Index];
   El("DetailTitle").textContent = Row[ColParagraf];
   El("DetailLaw").textContent = `${Row[ColGesetz]} · ${Row[ColLand]}`;
@@ -561,11 +593,58 @@ function ShowText(Index, OpenDetail) {
 // Detailbereich leeren (z.B. wenn nichts gefunden wurde)
 function ClearText() {
   State.CurrentIndex = -1;
+  State.WholeLaw = false;
+  El("DetailLaw").classList.remove("Active");
   El("DetailTitle").textContent = "";
   El("DetailLaw").textContent = "";
   El("LawBody").innerHTML = "";
   El("PreviousButton").disabled = true;
   El("NextButton").disabled = true;
+}
+
+// ======================================================================
+// Ganzes Gesetz als Fließtext
+//   Tippen auf "BauGB · Bund" in der Überschrift: Überschrift = Titel des Gesetzes, darunter alle
+//   Vorschriften hintereinander; die bisher angezeigte Vorschrift wird angesprungen.
+//   Erneutes Tippen: zurück zur einzelnen Vorschrift. Tippen auf eine Paragrafenüberschrift: diese anzeigen.
+// ======================================================================
+function DetailLaw_Click() {
+  if (State.CurrentIndex < 0) return;
+  if (State.WholeLaw) ShowText(State.CurrentIndex, false);
+  else ShowWholeLaw(State.CurrentIndex);
+}
+
+function LawBody_Click(E) {
+  const Heading = E.target.closest(".WholeHeading");
+  if (Heading) ShowText(+Heading.dataset.index, false);
+}
+
+function ShowWholeLaw(Index) {
+  const Row = State.Texts[Index];
+  const Block = (State.LawKeys.get(Row[ColGesetz].toLowerCase()) || []).find(L => L.First <= Index && Index <= L.Last);
+  if (!Block) return;
+
+  // Überschrift: Titel aus der Gesetzesliste, sonst die Titelzeile des Gesetzes
+  const Law = (State.Data.Laws || []).find(L => L[0] === Row[ColGesetz] && L[1] === Row[ColLand]);
+  El("DetailTitle").textContent = (Law && Law[2]) || State.Texts[Block.First][ColParagraf];
+
+  const Html = [];
+  for (let I = Block.First; I <= Block.Last; I++) {
+    Html.push(`<div class="WholeHeading" data-index="${I}">${Encode(State.Texts[I][ColParagraf])}</div>` +
+      State.Texts[I][ColHtml]);
+  }
+  El("LawBody").innerHTML = Html.join("");
+  Highlight(El("LawBody"), State.Words);
+
+  State.WholeLaw = true;
+  El("DetailLaw").classList.add("Active");
+  El("PreviousButton").disabled = true;           // Blättern gilt nur für einzelne Vorschriften
+  El("NextButton").disabled = true;
+
+  // zur bisher angezeigten Vorschrift springen
+  El("DetailScroll").scrollTop = 0;
+  const Current = El("LawBody").querySelector(`.WholeHeading[data-index="${Index}"]`);
+  if (Current && Index !== Block.First) Current.scrollIntoView({ block: "start" });
 }
 
 function SameLaw(IndexA, IndexB) {
