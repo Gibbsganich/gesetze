@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <!-- Gesetzessammlung Web-App - Version 07.11.2026b -->
+  <!-- Gesetzessammlung Web-App - eine Fassung für GitHub (iPhone/iPad) und das Windows-Programm (WebView2) -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -16,7 +16,12 @@
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="icon" href="icon-180.png">
   <title>Gesetzessammlung</title>
-  <link rel="stylesheet" href="app.css">
+  <!-- Im Windows-Programm (gesetze-app.example) app.css/app.js immer frisch laden (WebView2 hält sonst alte Fassungen);
+       im Web übernimmt das der Service Worker -->
+  <script>
+    const FreshStamp = location.hostname === "gesetze-app.example" ? "?" + Date.now() : "";
+    document.write('<link rel="stylesheet" href="app.css' + FreshStamp + '">');
+  </script>
   <!-- Stylesheet für das Mini-HTML: kommt aus der Datendatei (LawHtml.Css) -->
   <style id="LawCss"></style>
 </head>
@@ -67,17 +72,20 @@
     <div id="MenuBox">
       <h2>Datenbank</h2>
       <p id="DataInfo">Noch keine Daten geladen.</p>
+      <p class="Hint LocalOnly">Wird beim Start automatisch geladen von:<br><span id="DataPath"></span></p>
+      <button id="ReloadButton" type="button" class="BigButton LocalOnly">Datenbank neu laden</button>
       <label id="LoadLabel" class="BigButton">
-        Datenbank laden …
+        <span class="WebOnly">Datenbank laden …</span><span class="LocalOnly">Andere Datei laden …</span>
         <input id="FileInput" type="file" hidden>
       </label>
-      <p class="Hint">Datei <b>Gesetzessammlung_Web.json.gz</b> auswählen (z.B. aus iCloud Drive oder OneDrive).
+      <p class="Hint LocalOnly">Eine andere Datei gilt nur bis zum nächsten Start.</p>
+      <p class="Hint WebOnly">Datei <b>Gesetzessammlung_Web.json.gz</b> auswählen (z.B. aus iCloud Drive oder OneDrive).
         Die Daten werden nur auf diesem Gerät gespeichert.</p>
       <p class="Hint" id="AppVersion"></p>
       <button id="CloseMenuButton" type="button" class="BigButton Secondary">Schließen</button>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script>document.write('<script src="app.js' + FreshStamp + '"><\/script>');</script>
 </body>
 </html>

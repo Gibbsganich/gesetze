@@ -1,5 +1,5 @@
 /*
-  Gesetzessammlung Web-App - Version 07.11.2026f
+  Gesetzessammlung Web-App - eine Fassung für iPhone/iPad/Browser (GitHub) und das Windows-Programm (WebView2)
   Grundgerüst: Datenbank laden, einfache Suche, Liste, Anzeige der Vorschrift.
 
   Daten (aus LawWebExport.vb): Texts = Zeilen [Gesetz, Land, Paragraf, Nummer, Text, Html]
@@ -13,7 +13,15 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "30";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "31";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+
+// Zwei Betriebsarten mit denselben Dateien:
+//   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
+//   Lokal (Windows-Programm mit WebView2, virtuelle Adresse gesetze-app.example, oder index.html?data=...):
+//   Datenbank bei jedem Start ohne Nachfrage von DataUrl laden; nichts wird im Browser gespeichert.
+const LocalMode = location.hostname === "gesetze-app.example" || new URLSearchParams(location.search).has("data");
+const DataUrl = new URLSearchParams(location.search).get("data") ||
+  "https://gesetze-daten.example/Gesetzessammlung_Web.json.gz";
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -36,12 +44,14 @@ const IsWide = () => document.body.classList.contains("TwoColumns");
 // Start
 // ======================================================================
 window.addEventListener("load", async () => {
-  // Offline-Fähigkeit (nur über https bzw. localhost möglich)
-  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (!LocalMode) {
+    // Offline-Fähigkeit (nur über https bzw. localhost möglich)
+    if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+    // Daten sollen nicht automatisch vom System gelöscht werden
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   }
-  // Daten sollen nicht automatisch vom System gelöscht werden
-  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
   El("SearchBox").addEventListener("input", SearchBox_Input);
   El("ResultList").addEventListener("click", ResultList_Click);
@@ -62,6 +72,15 @@ window.addEventListener("load", async () => {
   El("AppVersion").textContent = "App-Version " + AppVersion;
   window.addEventListener("popstate", () => document.body.classList.remove("ShowDetail"));
 
+  // Lokal: Pfad und "neu laden" im Lade-Fenster zeigen, Hinweise für iPhone/iPad ausblenden
+  document.body.classList.toggle("LocalMode", LocalMode);
+  if (LocalMode) {
+    El("DataPath").textContent = DataUrl;
+    El("ReloadButton").addEventListener("click", async () => { ShowMenu(false); await LoadFromPath(); });
+    await LoadFromPath();
+    return;
+  }
+
   ShowWelcome("Datenbank wird geladen …");
   try {
     const Buffer = await LoadFromStorage();
@@ -76,6 +95,19 @@ window.addEventListener("load", async () => {
 });
 
 
+// Lokal: Datenbank ohne Nachfrage vom angegebenen Pfad laden (bei jedem Start frisch, nichts wird zwischengespeichert)
+async function LoadFromPath() {
+  ShowWelcome("Datenbank wird geladen …");
+  try {
+    const Response = await fetch(DataUrl, { cache: "no-store" });
+    if (!Response.ok) throw new Error(`Datei nicht gefunden (${Response.status})`);
+    ApplyData(await UnpackData(await Response.arrayBuffer()));
+  } catch (Ex) {
+    ShowWelcome(`Die Datenbank konnte nicht geladen werden: ${DataUrl} – ${Ex.message}`, true);
+  }
+}
+
+
 // ======================================================================
 // Datenbank: Datei einlesen, entpacken, auf dem Gerät speichern
 // ======================================================================
@@ -87,7 +119,7 @@ async function FileInput_Change(E) {
   try {
     const Buffer = await File.arrayBuffer();
     const Data = await UnpackData(Buffer);     // erst prüfen, dann speichern
-    await SaveToStorage(Buffer);
+    if (!LocalMode) await SaveToStorage(Buffer);   // lokal: nur für diese Sitzung
     ApplyData(Data);
     ShowMenu(false);
   } catch (Ex) {
