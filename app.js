@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "14";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "15";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -379,8 +379,9 @@ function ShowResults() {
   El("ResultList").innerHTML = Html.join("");
   El("ResultList").scrollTop = 0;
 
-  // iPad: erste Vorschrift gleich anzeigen
-  if (IsWide() && Count > 0) ShowText(State.Results[0], false);
+  // iPad: erste Vorschrift gleich anzeigen; ohne Treffer den Detailbereich leeren
+  if (Count === 0) ClearText();
+  else if (IsWide()) ShowText(State.Results[0], false);
 }
 
 // Stand der Daten, knapp: "Stand: 7.11.26"
@@ -506,6 +507,16 @@ function ShowText(Index, OpenDetail) {
   // erst jetzt scrollen (vorher ist die Vorschrift auf dem iPhone noch ausgeblendet)
   El("DetailScroll").scrollTop = 0;
   if (FirstMark) FirstMark.scrollIntoView({ block: "center" });
+}
+
+// Detailbereich leeren (z.B. wenn nichts gefunden wurde)
+function ClearText() {
+  State.CurrentIndex = -1;
+  El("DetailTitle").textContent = "";
+  El("DetailLaw").textContent = "";
+  El("LawBody").innerHTML = "";
+  El("PreviousButton").disabled = true;
+  El("NextButton").disabled = true;
 }
 
 function SameLaw(IndexA, IndexB) {
