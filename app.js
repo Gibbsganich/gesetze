@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "15";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "16";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -250,15 +250,24 @@ function ParseQuery(Input, Laws) {
   if (Query.Empty) return Query;
 
   // Zitat umstellen: "§ 35 Abs. 1 Satz 2 BauGB" -> "BauGB 35"; "§ 1 16. BImSchV" -> "16. BImSchV 1"
+  // Auch für Gesetze, die nicht in der Sammlung sind ("§ 1 GWB" -> "GWB 1"); nicht bei "…" (dann Volltext)
   const Citation = Text.match(/^(?:§§?|art\.?|artikel)\s*(\d+[a-z]?)\b/i);
-  if (Citation) {
+  if (Citation && !Text.includes('"')) {
     const Parts = Text.split(" ");
+    let Done = false;
     for (const Length of [2, 1]) {
       const Law = Parts.slice(-Length).join(" ");
       if (Parts.length > Length && State.LawKeys.has(Law.toLowerCase())) {
         Text = Law + " " + Citation[1];
+        Done = true;
         break;
       }
+    }
+    const Last = Parts[Parts.length - 1];
+    if (!Done && Parts.length > 2 && IsLawName(Last)) {
+      // zweiteilig wie "16. BImSchV": vorletztes Teil "16." gehört dazu
+      const Before = Parts[Parts.length - 2];
+      Text = (/^\d+\.$/.test(Before) && Parts.length > 3 ? Before + " " : "") + Last + " " + Citation[1];
     }
   }
 
@@ -284,6 +293,21 @@ function ParseQuery(Input, Laws) {
         Query.Laws = State.LawKeys.get(Key);
         Tokens = Tokens.slice(Length);
         break;
+      }
+    }
+    // Gesetz, das nicht in der Sammlung ist: "GWB 1", "16. BImSchV 3" (Name, dann Nummer)
+    // -> als Gesetz suchen (keine Treffer), nicht im Volltext. Mit "GWB" in Anführungszeichen: Volltext.
+    if (!Query.Laws) {
+      for (const Length of [2, 1]) {
+        if (!Plain(Length + 1)) continue;
+        const Name = Tokens.slice(0, Length).map(T => T.Text);
+        const NameOk = Length === 1 ? IsLawName(Name[0]) : /^\d+\.$/.test(Name[0]) && IsLawName(Name[1]);
+        if (NameOk && /^(\d+|\d+-\d+|\d+[a-z])$/i.test(Tokens[Length].Text)) {
+          Query.Laws = [];
+          Query.UnknownLaw = Name.join(" ");
+          Tokens = Tokens.slice(Length);
+          break;
+        }
       }
     }
   }
@@ -347,6 +371,11 @@ function FindTexts(Query) {
 // Suchmuster für ein Wort oder eine Phrase: zwischen den Wörtern einer Phrase beliebiger Leerraum (auch Zeilenwechsel)
 function WordPattern(Word) {
   return Word.split(/\s+/).map(EscapeRegExp).join("\\s+");
+}
+
+// Sieht aus wie eine Gesetzesabkürzung: enthält Buchstaben, keine Satzzeichen außer Punkt/Bindestrich
+function IsLawName(Text) {
+  return /[A-Za-zÄÖÜäöüß]/.test(Text) && /^[\wÄÖÜäöüß.\-]+$/.test(Text);
 }
 
 function EscapeRegExp(Text) {
