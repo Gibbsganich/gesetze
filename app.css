@@ -12,7 +12,8 @@
   --Line: #d0d0d0;
   --Text: #000000;
   --Muted: #6b6b6b;
-  --Selected: #dbe8fb;
+  --Selected: #dbe8fb;          /* Blau der Tasten (--Accent) in drei Stufen: kräftig, hell (Auswahl), sehr hell (Liste) */
+  --ListBack: #f2f7fe;
   --Accent: #0a64d8;
   --HeaderHeight: 47px;       /* Trefferzeile links = Überschriftzeile rechts (inkl. 1px Linie) */
   --ButtonSize: 36px;
@@ -140,6 +141,7 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 
 #ResultList {
   flex: 1;
+  background: var(--ListBack);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: env(safe-area-inset-bottom);
@@ -148,7 +150,7 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 .Item {
   padding: 8px 12px;
   padding-left: calc(12px + env(safe-area-inset-left));
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #e1eaf6;
   cursor: pointer;
 }
 .Item.Selected { background: var(--Selected); }
@@ -156,6 +158,7 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 .ItemParagraf { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .Welcome { padding: 16px; line-height: 1.5; }
+#LawBody .ImageHint { font-size: 0.85em; color: var(--Muted); }
 .Welcome ul { list-style: disc; margin: 6px 0 0 0; padding-left: 1.3em; }   /* gegen ul/li-Regeln aus LawHtml.Css */
 .Welcome li { margin: 2px 0; padding: 0; text-indent: 0; }
 .Welcome p { margin: 16px 0 0 0; }   /* Abstand wie eine Leerzeile */

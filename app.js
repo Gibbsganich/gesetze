@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "27";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "28";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -594,6 +594,7 @@ function ShowText(Index, OpenDetail) {
   El("DetailTitle").textContent = Row[ColParagraf];
   El("DetailLaw").textContent = `${Row[ColGesetz]} · ${Row[ColLand]}`;
   El("LawBody").innerHTML = Row[ColHtml];
+  CheckImages(El("LawBody"));
   const FirstMark = Highlight(El("LawBody"), State.Words);
 
   El("PreviousButton").disabled = !(Index > 0 && SameLaw(Index - 1, Index));
@@ -662,6 +663,7 @@ function ShowWholeLaw(Index) {
       State.Texts[I][ColHtml]);
   }
   El("LawBody").innerHTML = Html.join("");
+  CheckImages(El("LawBody"));
   Highlight(El("LawBody"), State.Words);
 
   State.WholeLaw = true;
@@ -673,6 +675,27 @@ function ShowWholeLaw(Index) {
   El("DetailScroll").scrollTop = 0;
   const Current = El("LawBody").querySelector(`.WholeHeading[data-index="${Index}"]`);
   if (Current && Index !== Block.First) Current.scrollIntoView({ block: "start" });
+}
+
+// Eingebettete Bilder (Formeln, Grafiken) kommen von gesetze-im-internet.de und brauchen Internet.
+// Lässt sich ein Bild nicht laden, erscheint statt eines leeren Rahmens ein Hinweis (mit der Adresse als Link).
+function CheckImages(Root) {
+  for (const Image of Root.querySelectorAll("img")) {
+    const Src = Image.getAttribute("src") || "";
+    const Local = /^([a-z]:\\|\\\\|file:)/i.test(Src);      // alter Stand: Pfad auf dem PC
+    const ShowHint = () => {
+      const Hint = document.createElement("a");
+      Hint.className = "ImageHint";
+      Hint.textContent = Local ? "[Bild nur in der Windows-App]" : "[Bild nicht geladen – antippen zum Öffnen]";
+      if (!Local) { Hint.href = Src; Hint.target = "_blank"; Hint.rel = "noopener noreferrer"; }
+      Hint.title = Src;
+      Image.replaceWith(Hint);
+    };
+    Image.referrerPolicy = "no-referrer";
+    if (Local) ShowHint();
+    else if (Image.complete && Image.naturalWidth === 0 && Src) ShowHint();
+    else Image.addEventListener("error", ShowHint, { once: true });
+  }
 }
 
 function SameLaw(IndexA, IndexB) {
