@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "29";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "30";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -593,7 +593,7 @@ function ShowText(Index, OpenDetail) {
   const Row = State.Texts[Index];
   El("DetailTitle").textContent = Row[ColParagraf];
   El("DetailLaw").textContent = `${Row[ColGesetz]} · ${Row[ColLand]}`;
-  El("LawBody").innerHTML = Row[ColHtml];
+  El("LawBody").innerHTML = ResolveImages(Row[ColHtml]);
   CheckImages(El("LawBody"));
   const FirstMark = Highlight(El("LawBody"), State.Words);
 
@@ -660,7 +660,7 @@ function ShowWholeLaw(Index) {
   const Html = [];
   for (let I = Block.First; I <= Block.Last; I++) {
     Html.push(`<div class="WholeHeading" data-index="${I}">${Encode(State.Texts[I][ColParagraf])}</div>` +
-      State.Texts[I][ColHtml]);
+      ResolveImages(State.Texts[I][ColHtml]));
   }
   El("LawBody").innerHTML = Html.join("");
   CheckImages(El("LawBody"));
@@ -705,6 +705,17 @@ function CheckImages(Root) {
       if (Image.complete && Image.naturalWidth === 0 && Src) OnError();
     }
   }
+}
+
+// Bilder aus dem Bilderordner ("bilder/<Ordner>/<Datei>", siehe LawFiles.ImageFolderPath): Die Exportdatei bringt sie im
+// Abschnitt Images als data-Adresse mit (offline verfügbar). Fehlt ein Bild dort, die Adresse bei gesetze-im-internet.de.
+function ResolveImages(Html) {
+  if (!Html || !Html.includes('src="bilder/')) return Html;
+  const Images = (State.Data && State.Data.Images) || {};
+  return Html.replace(/src="bilder\/([^"]+)"/g, (Match, Name) => {
+    Name = Name.replace(/&amp;/g, "&");
+    return `src="${Images[Name] || GiiImageUrl("https://www.gesetze-im-internet.de/" + Name) || ""}"`;
+  });
 }
 
 // GII-Bildadresse: ".../<ordner>/pdf_formel_x.gif" -> ".../normengrafiken/pdf/formel_x.gif"; sonst null
