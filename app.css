@@ -151,6 +151,7 @@ body:not(.ShowDetail) #DetailPane { display: none; }
 .Welcome { padding: 16px; line-height: 1.5; }
 .Welcome ul { list-style: disc; margin: 6px 0 0 0; padding-left: 1.3em; }   /* gegen ul/li-Regeln aus LawHtml.Css */
 .Welcome li { margin: 2px 0; padding: 0; text-indent: 0; }
+.Welcome p { margin: 16px 0 0 0; }   /* Abstand wie eine Leerzeile */
 
 
 /* ---------- Vorschrift ---------- */

@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "16";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "17";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -200,7 +200,10 @@ function RunSearch() {
     El("ListInfo").textContent = DataStand() + " · Version " + AppVersion;
     El("ResultList").innerHTML = `<div class="Welcome">Suchbegriff eingeben, z.B.<ul>` +
       `<li>baugb 35</li><li>baugb 30-35</li><li>baugb außenbereich</li><li>§ 35 Abs. 1 BauGB</li>` +
-      `<li>"schädliche Umwelteinwirkungen"</li><li>baugb 34 + 35</li></ul></div>`;
+      `<li>"schädliche Umwelteinwirkungen"</li><li>baugb 34 + 35</li></ul>` +
+      `<p>Suchbegriffe wie baugb 35 oder § 35 baugb werden nur als Gesetze und Paragrafen gesucht, nicht im Volltext. ` +
+      `Suchbegriffe in Anführungszeichen werden nur im Volltext gesucht, auch wenn es sich um Gesetze handelt.</p>` +
+      `<p>Gesetzessammlung<br>© 2026 Bernd Schieferdecker</p></div>`;
     return;
   }
   // Oder: Treffer aller Teile zusammenführen (jede Vorschrift einmal, in der Reihenfolge der Sammlung)
