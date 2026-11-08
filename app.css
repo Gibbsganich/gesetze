@@ -57,7 +57,7 @@ body {
 /* Als App vom Home-Bildschirm: iOS zeichnet unter der Statusleiste einen weichen Übergang.
    Etwas mehr Abstand nach oben, damit nur der leere Balken davon betroffen ist, nicht das Suchfeld. */
 @media (display-mode: standalone) {
-  #SearchBar { padding-top: calc(18px + env(safe-area-inset-top)); }
+  #SearchBar { padding-top: calc(20px + env(safe-area-inset-top)); }
 }
 
 /* Suchfeld: 20% höher als die Tasten, Ränder halbkreisförmig, dünne blaue Linie im Blau der Tasten */
