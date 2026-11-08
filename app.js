@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "28";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "29";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -678,24 +678,39 @@ function ShowWholeLaw(Index) {
 }
 
 // Eingebettete Bilder (Formeln, Grafiken) kommen von gesetze-im-internet.de und brauchen Internet.
-// Lässt sich ein Bild nicht laden, erscheint statt eines leeren Rahmens ein Hinweis (mit der Adresse als Link).
+// Die Datenbank enthält Adressen wie .../bimschv_18/pdf_formel_bimschv18_anhang1.gif; GII legt die Bilder aber unter
+// .../normengrafiken/pdf/formel_bimschv18_anhang1.gif ab. Darum: erst die gespeicherte Adresse, dann die GII-Adresse.
+// Lässt sich ein Bild gar nicht laden, erscheint statt eines leeren Rahmens ein Hinweis (mit der Adresse als Link).
 function CheckImages(Root) {
   for (const Image of Root.querySelectorAll("img")) {
     const Src = Image.getAttribute("src") || "";
-    const Local = /^([a-z]:\\|\\\\|file:)/i.test(Src);      // alter Stand: Pfad auf dem PC
+    const Local = /^([a-z]:\\|\\\\|file:)/i.test(Src);      // Pfad auf dem PC
+    const Alternative = GiiImageUrl(Src);
     const ShowHint = () => {
       const Hint = document.createElement("a");
       Hint.className = "ImageHint";
       Hint.textContent = Local ? "[Bild nur in der Windows-App]" : "[Bild nicht geladen – antippen zum Öffnen]";
-      if (!Local) { Hint.href = Src; Hint.target = "_blank"; Hint.rel = "noopener noreferrer"; }
-      Hint.title = Src;
+      if (!Local) { Hint.href = Alternative || Src; Hint.target = "_blank"; Hint.rel = "noopener noreferrer"; }
+      Hint.title = Alternative || Src;
       Image.replaceWith(Hint);
+    };
+    const OnError = () => {
+      if (Alternative && Image.getAttribute("src") !== Alternative) Image.setAttribute("src", Alternative);
+      else ShowHint();
     };
     Image.referrerPolicy = "no-referrer";
     if (Local) ShowHint();
-    else if (Image.complete && Image.naturalWidth === 0 && Src) ShowHint();
-    else Image.addEventListener("error", ShowHint, { once: true });
+    else {
+      Image.addEventListener("error", OnError);
+      if (Image.complete && Image.naturalWidth === 0 && Src) OnError();
+    }
   }
+}
+
+// GII-Bildadresse: ".../<ordner>/pdf_formel_x.gif" -> ".../normengrafiken/pdf/formel_x.gif"; sonst null
+function GiiImageUrl(Src) {
+  const Match = Src.match(/^(https?:\/\/www\.gesetze-im-internet\.de\/)(?!normengrafiken\/)[^\/]+\/([a-z0-9]+)_([^\/]+)$/i);
+  return Match ? Match[1] + "normengrafiken/" + Match[2] + "/" + Match[3] : null;
 }
 
 function SameLaw(IndexA, IndexB) {
