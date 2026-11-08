@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "18";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "19";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -57,6 +57,7 @@ window.addEventListener("load", async () => {
   El("FileInput").addEventListener("change", FileInput_Change);
   El("AppVersion").textContent = "App-Version " + AppVersion;
   window.addEventListener("popstate", () => document.body.classList.remove("ShowDetail"));
+  document.addEventListener("keydown", Document_KeyDown);
 
   ShowWelcome("Datenbank wird geladen …");
   try {
@@ -191,6 +192,28 @@ function SearchBox_Input() {
   SearchTimer = setTimeout(RunSearch, 250);
 }
 
+// F1 (PC-Tastatur): Liste der Gesetze in der Sammlung
+function Document_KeyDown(E) {
+  if (E.key !== "F1") return;
+  E.preventDefault();                 // sonst öffnet der Browser seine Hilfe
+  ShowLawList();
+}
+
+// Titelzeilen (erste Zeile jedes Gesetzes, Nummer 0) = je Gesetz eine Zeile, alphabetisch nach Gesetz und Land.
+// Über die erste Zeile statt nur über Nummer 0, damit kein Gesetz doppelt oder gar nicht erscheint.
+function ShowLawList() {
+  if (!State.Data) return;
+  clearTimeout(SearchTimer);
+  El("SearchBox").value = "";
+  State.Words = [];
+  State.Results = [];
+  State.LawKeys.forEach(List => List.forEach(Law => State.Results.push(Law.First)));
+  const Name = Index => State.Texts[Index][ColGesetz] + " " + State.Texts[Index][ColLand];
+  State.Results.sort((A, B) => Name(A).localeCompare(Name(B), "de", { sensitivity: "base", numeric: true }));
+  ShowResults();
+  El("ListInfo").textContent = `${State.Results.length} Gesetze · ` + DataStand();
+}
+
 function RunSearch() {
   if (!State.Data) return;
   const Queries = ParseInput(El("SearchBox").value);
@@ -204,6 +227,7 @@ function RunSearch() {
       `<li>"schädliche Umwelteinwirkungen"</li><li>baugb 34 + 35</li></ul>` +
       `<p>Suchbegriffe wie baugb 35 oder § 35 baugb werden nur als Gesetze und Paragrafen gesucht, nicht im Volltext. ` +
       `Suchbegriffe in Anführungszeichen werden nur im Volltext gesucht, auch wenn es sich um Gesetze handelt.</p>` +
+      `<p>F1 zeigt eine Liste der in der Gesetzessammlung enthaltenen Gesetze.</p>` +
       `<p>Gesetzessammlung<br>© 2026 Bernd Schieferdecker</p></div>`;
     return;
   }
