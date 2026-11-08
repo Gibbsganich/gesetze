@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "13";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "14";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
@@ -369,6 +369,12 @@ function ShowResults() {
     Html.push(`<div class="Item" data-index="${Index}">` +
       `<div class="ItemLaw">${Encode(Row[ColGesetz])} · ${Encode(Row[ColLand])}</div>` +
       `<div class="ItemParagraf">${Encode(Row[ColParagraf])}</div></div>`);
+  }
+  // Nichts gefunden: Hinweis und Google-Suche (öffnet Safari bzw. den Standardbrowser)
+  if (Count === 0) {
+    const Url = "https://www.google.com/search?q=" + encodeURIComponent(El("SearchBox").value.trim());
+    Html.push(`<div class="Welcome">In der Gesetzessammlung wurde nichts gefunden.` +
+      `<a class="BigButton GoogleButton" href="${Url}" target="_blank" rel="noopener">mit Google suchen</a></div>`);
   }
   El("ResultList").innerHTML = Html.join("");
   El("ResultList").scrollTop = 0;

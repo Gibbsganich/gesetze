@@ -263,3 +263,5 @@ body.TwoColumns #ListInfo:empty { display: flex; }   /* gleiche Höhe wie rechts
   cursor: pointer;
 }
 .BigButton.Secondary { background: #e9e9e9; color: #000; }
+a.BigButton { text-decoration: none; }
+.GoogleButton { margin-top: 24px; max-width: 280px; }
