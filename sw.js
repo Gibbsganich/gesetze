@@ -3,7 +3,7 @@
   Speichert die Programmdateien auf dem Gerät. Die Gesetzestexte liegen nicht hier, sondern in IndexedDB.
   Nach jeder Änderung an den Programmdateien: CacheName erhöhen, damit iPhone/iPad die neue Fassung laden.
 */
-const CacheName = "Gesetzessammlung-35";
+const CacheName = "Gesetzessammlung-36";
 const Files = ["./", "index.html", "app.css", "app.js", "manifest.json", "icon-180.png", "icon-512.png"];
 
 self.addEventListener("install", E => {
