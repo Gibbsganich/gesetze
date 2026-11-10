@@ -98,6 +98,9 @@ body {
 .BarButton svg { width: 20px; height: 20px; }
 #BackButton { font-size: 24px; line-height: 1; padding-bottom: 3px; }
 
+/* Windows-Programm: oberste Zeile ausblendbar (GesetzeApp.ShowSearchBar(false) bzw. index.html?bar=0) */
+body.NoSearchBar #SearchBar { display: none; }
+
 /* iPhone, Liste: Zurück und Blättern ausblenden (nichts angezeigt) */
 body:not(.ShowDetail) #BackButton,
 body:not(.ShowDetail) #PreviousButton,

@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "31";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "32";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 
 // Zwei Betriebsarten mit denselben Dateien:
 //   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
@@ -72,6 +72,11 @@ window.addEventListener("load", async () => {
   El("AppVersion").textContent = "App-Version " + AppVersion;
   window.addEventListener("popstate", () => document.body.classList.remove("ShowDetail"));
 
+  // Start-Parameter (z.B. aus dem Windows-Programm): index.html?q=baugb%2035&bar=0
+  const Parameters = new URLSearchParams(location.search);
+  if (Parameters.get("bar") === "0") GesetzeApp.ShowSearchBar(false);
+  if (Parameters.has("q")) GesetzeApp.Search(Parameters.get("q"));
+
   // Lokal: Pfad und "neu laden" im Lade-Fenster zeigen, Hinweise für iPhone/iPad ausblenden
   document.body.classList.toggle("LocalMode", LocalMode);
   if (LocalMode) {
@@ -106,6 +111,35 @@ async function LoadFromPath() {
     ShowWelcome(`Die Datenbank konnte nicht geladen werden: ${DataUrl} – ${Ex.message}`, true);
   }
 }
+
+
+// ======================================================================
+// Schnittstelle für das Windows-Programm (WebView2: ExecuteScriptAsync)
+//   GesetzeApp.Search("baugb 35")      wie eine Eingabe im Suchfeld; Rückgabe: Zahl der Treffer
+//                                      (-1 = Daten noch nicht geladen: die Suche wird nach dem Laden ausgeführt)
+//   GesetzeApp.ShowSearchBar(false)    oberste Zeile mit dem Suchfeld aus-/einblenden
+// ======================================================================
+State.PendingSearch = null;
+
+const GesetzeApp = {
+  Search(Text) {
+    Text = String(Text ?? "");
+    El("SearchBox").value = Text;
+    if (!State.Data) {
+      State.PendingSearch = Text;
+      return -1;
+    }
+    clearTimeout(SearchTimer);
+    if (document.body.classList.contains("ShowDetail") && !IsWide()) history.back();
+    RunSearch();
+    return State.Results.length;
+  },
+  ShowSearchBar(Visible) {
+    document.body.classList.toggle("NoSearchBar", !Visible);
+    return Visible;
+  }
+};
+window.GesetzeApp = GesetzeApp;
 
 
 // ======================================================================
@@ -166,6 +200,14 @@ function ApplyData(Data) {
   El("DataInfo").textContent = `${State.Texts.length.toLocaleString("de-DE")} Vorschriften aus ` +
     `${CountLaws().toLocaleString("de-DE")} Gesetzen, Stand ${Created}.`;
   RunSearch();
+  // Suche, die vor dem Laden der Daten übergeben wurde (Windows-Programm), jetzt ausführen
+  if (State.PendingSearch !== null) {
+    const Text = State.PendingSearch;
+    State.PendingSearch = null;
+    GesetzeApp.Search(Text);
+  }
+  // Windows-Programm benachrichtigen: Daten sind geladen
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage({ Event: "Ready", Count: State.Texts.length });
 }
 
 function CountLaws() {
