@@ -8,7 +8,7 @@
 :root {
   --Background: #ffffff;
   --Bar: #f6f6f6;
-  --SubBar: #fbfbfb;           /* Trefferzeile und Überschrift: heller als die Suchzeile */
+  --SubBar: #f6f6f6;           /* Trefferzeile und Überschrift: Grau (früher das der Suchzeile) */
   --Line: #d0d0d0;
   --Text: #000000;
   --Muted: #6b6b6b;
@@ -51,7 +51,7 @@ body {
   padding-top: calc(8px + env(safe-area-inset-top));
   padding-left: calc(8px + env(safe-area-inset-left));
   padding-right: calc(8px + env(safe-area-inset-right));
-  background: var(--Bar);
+  background: var(--Background);   /* Suchzeile weiß */
   border-bottom: 1px solid var(--Line);
 }
 
