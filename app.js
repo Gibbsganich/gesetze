@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "34";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "35";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 
 // Zwei Betriebsarten mit denselben Dateien:
 //   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
@@ -44,7 +44,14 @@ const IsWide = () => document.body.classList.contains("TwoColumns");
 // Start
 // ======================================================================
 window.addEventListener("load", async () => {
-  if (!LocalMode) {
+  if (LocalMode) {
+    // Windows-Programm: keinen Service Worker verwenden; einen früher eingerichteten samt Zwischenspeicher entfernen,
+    // damit immer die aktuellen Dateien aus dem Ordner gelten
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then(List => List.forEach(R => R.unregister())).catch(() => {});
+    }
+    if (window.caches) caches.keys().then(Keys => Keys.forEach(Key => caches.delete(Key))).catch(() => {});
+  } else {
     // Offline-Fähigkeit (nur über https bzw. localhost möglich)
     if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
       navigator.serviceWorker.register("sw.js").catch(() => {});

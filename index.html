@@ -16,10 +16,10 @@
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="icon" href="icon-180.png">
   <title>Gesetzessammlung</title>
-  <!-- Im Windows-Programm (gesetze-app.example) app.css/app.js immer frisch laden (WebView2 hält sonst alte Fassungen);
-       im Web übernimmt das der Service Worker -->
+  <!-- Außerhalb von GitHub (Windows-Programm, gleich unter welcher Adresse) app.css/app.js immer frisch laden
+       (WebView2 hält sonst alte Fassungen); auf GitHub übernimmt das der Service Worker -->
   <script>
-    const FreshStamp = location.hostname === "gesetze-app.example" ? "?" + Date.now() : "";
+    const FreshStamp = location.hostname.endsWith("github.io") ? "" : "?" + Date.now();
     document.write('<link rel="stylesheet" href="app.css' + FreshStamp + '">');
   </script>
   <!-- Stylesheet für das Mini-HTML: kommt aus der Datendatei (LawHtml.Css) -->
