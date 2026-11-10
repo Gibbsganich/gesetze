@@ -47,8 +47,8 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px;
-  padding-top: calc(8px + env(safe-area-inset-top));
+  padding: 9px 8px;            /* oben/unten 1px mehr als seitlich: Suchfeld 2px flacher, Leiste gleich hoch */
+  padding-top: calc(9px + env(safe-area-inset-top));
   padding-left: calc(8px + env(safe-area-inset-left));
   padding-right: calc(8px + env(safe-area-inset-right));
   background: var(--Background);   /* Suchzeile weiß */
@@ -58,14 +58,14 @@ body {
 /* Als App vom Home-Bildschirm: iOS zeichnet unter der Statusleiste einen weichen Übergang.
    Etwas mehr Abstand nach oben, damit nur der leere Balken davon betroffen ist, nicht das Suchfeld. */
 @media (display-mode: standalone) {
-  #SearchBar { padding-top: calc(20px + env(safe-area-inset-top)); }
+  #SearchBar { padding-top: calc(21px + env(safe-area-inset-top)); }
 }
 
 /* Suchfeld: 20% höher als die Tasten, Ränder halbkreisförmig, dünne blaue Linie im Blau der Tasten */
 #SearchBox {
   flex: 1;
   min-width: 0;
-  height: calc(var(--ButtonSize) * 1.2);
+  height: calc(var(--ButtonSize) * 1.2 - 2px);
   font-size: 18px;            /* ab 16px vergrößert iOS beim Tippen nicht die Seite */
   padding: 0 16px;
   border: 1px solid var(--Accent);
