@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "37";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "38";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 
 // Zwei Betriebsarten mit denselben Dateien:
 //   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
@@ -28,6 +28,7 @@ const State = {
   Data: null,                      // ganze Datendatei (Version, Created, Css, Laws, Texts)
   Texts: [],                       // alle Vorschriften
   LawKeys: new Map(),              // "baugb" -> [{ Gesetz, Land, First, Last }]  (Gesetz klein geschrieben)
+  EuKeys: new Map(),               // CELEX "32000L0060" -> [{ Gesetz, Land, First, Last }]  (Laws[3], 11.11.2026)
   Results: [],                     // Indizes in Texts
   CurrentIndex: -1,                // angezeigte Vorschrift
   WholeLaw: false,                 // true = ganzes Gesetz als Fließtext angezeigt
@@ -197,6 +198,16 @@ function ApplyData(Data) {
     if (!State.LawKeys.has(Key)) State.LawKeys.set(Key, []);
     State.LawKeys.get(Key).push(Previous);
   });
+  // EU-Rechtsakte: CELEX-Nummer (4. Wert in Laws) -> Gesetz der Sammlung, für die Suche "RL 2000/60"
+  State.EuKeys = new Map();
+  for (const Law of Data.Laws || []) {
+    if (!Law[3]) continue;
+    const Found = (State.LawKeys.get(String(Law[0]).toLowerCase()) || []).filter(L => L.Land === Law[1]);
+    if (Found.length === 0) continue;
+    const Key = Law[3].toUpperCase();
+    if (!State.EuKeys.has(Key)) State.EuKeys.set(Key, []);
+    State.EuKeys.get(Key).push(...Found);
+  }
 
   // Stylesheet der Windows-App; "body" wird zum Anzeigebereich #LawBody
   // Einzüge in cm werden zu em (bezogen auf 16px), damit sie in der Leseansicht mit der Schrift wachsen
@@ -263,6 +274,8 @@ async function LoadFromStorage() {
 //   "baugb außenbereich"        Wort im Gesetz
 //   "außenbereich"              Volltext in allen Gesetzen (alle Wörter müssen vorkommen)
 //   "§ 35 Abs. 1 BauGB"         Zitat wird umgestellt
+//   "RL 2000/60 4"              EU-Rechtsakt mit Art und Nummer (auch "Richtlinie 2000/60/EG",
+//                               "VO (EG) Nr. 1907/2006", "Art. 4 Abs. 1 RL 2000/60"); nicht "2000/60" allein
 //   "\"schädliche Umwelt\""     Phrase: Wörter genau in dieser Reihenfolge
 //   "baugb 34 + 35"             Oder: Teile mit "+" oder " OR " getrennt; ein Teil ohne Gesetz
 //   "lärm OR geräusch"          gilt für das Gesetz des ersten Teils (hier: kein Gesetz = Volltext)
@@ -375,6 +388,14 @@ function ParseQuery(Input, Laws) {
         break;
       }
     }
+    // EU-Rechtsakt am Ende ("Art. 4 Abs. 1 RL 2000/60", "Art. 4 der Richtlinie 2000/60/EG")
+    for (let Start = 2; !Done && Start < Parts.length; Start++) {
+      const Eu = ParseEu(Parts.slice(Start));
+      if (Eu && Eu.WordCount === Parts.length - Start) {
+        Text = Parts.slice(Start).join(" ") + " " + Citation[1];
+        Done = true;
+      }
+    }
     const Last = Parts[Parts.length - 1];
     if (!Done && Parts.length > 2 && IsLawName(Last)) {
       // zweiteilig wie "16. BImSchV": vorletztes Teil "16." gehört dazu
@@ -415,6 +436,18 @@ function ParseQuery(Input, Laws) {
         Query.Laws = State.LawKeys.get(Key);
         Tokens = Tokens.slice(Length);
         break;
+      }
+    }
+    // EU-Rechtsakt: "RL 2000/60", "Richtlinie 2000/60/EG", "VO (EG) Nr. 1907/2006"
+    // -> Gesetz der Sammlung mit dieser CELEX-Nummer (z.B. WRRL); nicht in der Sammlung: keine Treffer
+    if (!Query.Laws) {
+      let PlainCount = 0;
+      while (PlainCount < Tokens.length && !Tokens[PlainCount].Phrase) PlainCount++;
+      const Eu = ParseEu(Tokens.slice(0, PlainCount).map(T => T.Text));
+      if (Eu) {
+        Query.Laws = State.EuKeys.get(Eu.Celex) || [];
+        if (Query.Laws.length === 0) Query.UnknownLaw = Eu.Name;
+        Tokens = Tokens.slice(Eu.WordCount);
       }
     }
     // Gesetz, das nicht in der Sammlung ist: "GWB 1", "16. BImSchV 3" (Name, dann Nummer)
@@ -506,6 +539,45 @@ function FindLand(Text) {
     for (const Law of List) if (Law.Land.toLowerCase() === Key) return Law.Land;
   }
   return null;
+}
+
+// EU-Rechtsakt am Anfang der Wörter (wie LawCitation.ParseEu in der Windows-App):
+// "RL 2000/60", "Richtlinie 2000/60/EG", "VO (EG) Nr. 1907/2006", "Beschluss 2011/753"
+// -> { Celex: "32000L0060", Name: "RL 2000/60", WordCount: 2 }; sonst null
+function ParseEu(Words) {
+  if (!Words || Words.length < 2) return null;
+  const Kinds = { rl: ["L", "RL"], richtlinie: ["L", "RL"], vo: ["R", "VO"], verordnung: ["R", "VO"], beschluss: ["D", "Beschluss"] };
+  const Kind = Kinds[Words[0].toLowerCase()];
+  if (!Kind) return null;
+  // "(EU)", "(EG)", "(EWG)" und "Nr." überspringen
+  let Index = 1;
+  while (Index < Words.length && (Words[Index].startsWith("(") || /^nr\.?$/i.test(Words[Index]))) Index++;
+  if (Index >= Words.length) return null;
+  const Celex = EuCelex(Kind[0], Words[Index]);
+  if (!Celex) return null;
+  return { Celex, Name: Kind[1] + " " + EuNumber(Celex), WordCount: Index + 1 };
+}
+
+// CELEX-Nummer aus Art ("L", "R", "D") und Nummer (wie LawNames.EuCelex):
+// "2000/60/EG" (L) -> "32000L0060"; "1907/2006" (R, bis 2014 Nummer/Jahr) -> "32006R1907"; "92/43/EWG" -> "31992L0043"
+function EuCelex(Kind, Number) {
+  const Parts = String(Number).trim().split("/");
+  if (Parts.length < 2 || !/^\d{1,4}$/.test(Parts[0]) || !/^\d{1,4}$/.test(Parts[1])) return "";
+  let Year, Nr;
+  if (Parts[0].length === 4 && +Parts[0] >= 2015) { Year = +Parts[0]; Nr = +Parts[1]; }   // seit 2015 Jahr/Nummer
+  else if (Kind === "R") { Nr = +Parts[0]; Year = +Parts[1]; }                              // Verordnungen bis 2014
+  else { Year = +Parts[0]; Nr = +Parts[1]; }
+  if (Year < 100) Year += Year < 50 ? 2000 : 1900;
+  if (Year < 1950 || Year > 2100 || Nr < 1 || Nr > 9999) return "";
+  return "3" + Year + Kind + String(Nr).padStart(4, "0");
+}
+
+// EU-Nummer aus der CELEX-Nummer (wie LawNames.EuNumber): "32000L0060" -> "2000/60", "32006R1907" -> "1907/2006"
+function EuNumber(Celex) {
+  const Match = /^3(\d{4})([A-Z])(\d{4})/.exec(Celex);
+  if (!Match) return "";
+  const Year = +Match[1], Number = +Match[3];
+  return Match[2] === "R" && Year < 2015 ? Number + "/" + Year : Year + "/" + Number;
 }
 
 // Sieht aus wie eine Gesetzesabkürzung: enthält Buchstaben, keine Satzzeichen außer Punkt/Bindestrich
