@@ -70,7 +70,7 @@ body {
   padding: 0 16px;
   border: 1px solid var(--Accent);
   border-radius: 999px;       /* halbkreisförmige Enden */
-  color: var(--Accent);       /* Suchtext im Blau der Umrandung (Test) */
+  color: var(--Accent);       /* Suchtext im Blau der Umrandung */
   background: #fff;
   outline: none;
   -webkit-appearance: none;   /* Safari: eigene Form statt Standard-Suchfeld */

@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "39";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "38";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 
 // Zwei Betriebsarten mit denselben Dateien:
 //   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
@@ -21,14 +21,13 @@ const AppVersion = "39";      // wie CacheName in sw.js – wird im Lade-Fenster
 //   Datenbank bei jedem Start ohne Nachfrage von DataUrl laden; nichts wird im Browser gespeichert.
 const LocalMode = location.hostname === "gesetze-app.example" || new URLSearchParams(location.search).has("data");
 const DataUrl = new URLSearchParams(location.search).get("data") ||
-  "https://gesetze-daten.example/Gesetzessammlung.json.gz";
+  "https://gesetze-daten.example/Gesetzessammlung_Web.json.gz";
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
   Data: null,                      // ganze Datendatei (Version, Created, Css, Laws, Texts)
   Texts: [],                       // alle Vorschriften
   LawKeys: new Map(),              // "baugb" -> [{ Gesetz, Land, First, Last }]  (Gesetz klein geschrieben)
-  EuKeys: new Map(),               // CELEX "32000L0060" -> [{ Gesetz, Land, First, Last }]  (Laws[3], 11.11.2026)
   Results: [],                     // Indizes in Texts
   CurrentIndex: -1,                // angezeigte Vorschrift
   WholeLaw: false,                 // true = ganzes Gesetz als Fließtext angezeigt
@@ -98,7 +97,7 @@ window.addEventListener("load", async () => {
   try {
     const Buffer = await LoadFromStorage();
     if (Buffer) {
-      ApplyData(await UnpackData(Buffer));
+      ApplyData(await UnpackData(Buffer), await LoadFromStorage("Name"));
     } else {
       ShowWelcome("Noch keine Daten auf diesem Gerät.", true);
     }
@@ -114,7 +113,7 @@ async function LoadFromPath() {
   try {
     const Response = await fetch(DataUrl, { cache: "no-store" });
     if (!Response.ok) throw new Error(`Datei nicht gefunden (${Response.status})`);
-    ApplyData(await UnpackData(await Response.arrayBuffer()));
+    ApplyData(await UnpackData(await Response.arrayBuffer()), CollectionNameFrom(DataUrl));
   } catch (Ex) {
     ShowWelcome(`Die Datenbank konnte nicht geladen werden: ${DataUrl} – ${Ex.message}`, true);
   }
@@ -161,8 +160,12 @@ async function FileInput_Change(E) {
   try {
     const Buffer = await File.arrayBuffer();
     const Data = await UnpackData(Buffer);     // erst prüfen, dann speichern
-    if (!LocalMode) await SaveToStorage(Buffer);   // lokal: nur für diese Sitzung
-    ApplyData(Data);
+    const Name = CollectionNameFrom(File.name);
+    if (!LocalMode) {                          // lokal: nur für diese Sitzung
+      await SaveToStorage(Buffer);
+      await SaveToStorage(Name, "Name");
+    }
+    ApplyData(Data, Name);
     ShowMenu(false);
   } catch (Ex) {
     El("DataInfo").textContent = "Fehler: " + Ex.message;
@@ -183,8 +186,9 @@ async function UnpackData(Buffer) {
 }
 
 // Daten übernehmen und Verzeichnis der Gesetze aufbauen
-function ApplyData(Data) {
+function ApplyData(Data, Name) {
   State.Data = Data;
+  State.CollectionName = Data.Name || Name || "";   // Name in der Datei hat Vorrang, sonst aus dem Dateinamen
   State.Texts = Data.Texts;
   State.LawKeys = new Map();
   let Previous = null;
@@ -198,16 +202,6 @@ function ApplyData(Data) {
     if (!State.LawKeys.has(Key)) State.LawKeys.set(Key, []);
     State.LawKeys.get(Key).push(Previous);
   });
-  // EU-Rechtsakte: CELEX-Nummer (4. Wert in Laws) -> Gesetz der Sammlung, für die Suche "RL 2000/60"
-  State.EuKeys = new Map();
-  for (const Law of Data.Laws || []) {
-    if (!Law[3]) continue;
-    const Found = (State.LawKeys.get(String(Law[0]).toLowerCase()) || []).filter(L => L.Land === Law[1]);
-    if (Found.length === 0) continue;
-    const Key = Law[3].toUpperCase();
-    if (!State.EuKeys.has(Key)) State.EuKeys.set(Key, []);
-    State.EuKeys.get(Key).push(...Found);
-  }
 
   // Stylesheet der Windows-App; "body" wird zum Anzeigebereich #LawBody
   // Einzüge in cm werden zu em (bezogen auf 16px), damit sie in der Leseansicht mit der Schrift wachsen
@@ -244,20 +238,21 @@ function OpenStorage() {
   });
 }
 
-async function SaveToStorage(Buffer) {
+// Eintrag "Data" = gepackte Datenbank, "Name" = Name der Sammlung
+async function SaveToStorage(Value, Key = "Data") {
   const Db = await OpenStorage();
   return new Promise((Resolve, Reject) => {
     const Transaction = Db.transaction("Files", "readwrite");
-    Transaction.objectStore("Files").put(Buffer, "Data");
+    Transaction.objectStore("Files").put(Value, Key);
     Transaction.oncomplete = () => Resolve();
     Transaction.onerror = () => Reject(Transaction.error);
   });
 }
 
-async function LoadFromStorage() {
+async function LoadFromStorage(Key = "Data") {
   const Db = await OpenStorage();
   return new Promise((Resolve, Reject) => {
-    const Request = Db.transaction("Files").objectStore("Files").get("Data");
+    const Request = Db.transaction("Files").objectStore("Files").get(Key);
     Request.onsuccess = () => Resolve(Request.result || null);
     Request.onerror = () => Reject(Request.error);
   });
@@ -274,8 +269,6 @@ async function LoadFromStorage() {
 //   "baugb außenbereich"        Wort im Gesetz
 //   "außenbereich"              Volltext in allen Gesetzen (alle Wörter müssen vorkommen)
 //   "§ 35 Abs. 1 BauGB"         Zitat wird umgestellt
-//   "RL 2000/60 4"              EU-Rechtsakt mit Art und Nummer (auch "Richtlinie 2000/60/EG",
-//                               "VO (EG) Nr. 1907/2006", "Art. 4 Abs. 1 RL 2000/60"); nicht "2000/60" allein
 //   "\"schädliche Umwelt\""     Phrase: Wörter genau in dieser Reihenfolge
 //   "baugb 34 + 35"             Oder: Teile mit "+" oder " OR " getrennt; ein Teil ohne Gesetz
 //   "lärm OR geräusch"          gilt für das Gesetz des ersten Teils (hier: kein Gesetz = Volltext)
@@ -313,7 +306,8 @@ function RunSearch() {
   if (Queries.length === 0) {
     State.Results = [];
     ClearText();                                  // Detailbereich leeren
-    El("ListInfo").textContent = DataStand() + " · Version " + AppVersion;
+    El("ListInfo").textContent = (State.CollectionName ? State.CollectionName + " · " : "") +
+      DataStand() + " · Version " + AppVersion;
     El("ResultList").innerHTML = `<div class="Welcome">Suchbegriff eingeben, z.B.<ul>` +
       `<li>baugb 35</li><li>baugb 30-35</li><li>baugb außenbereich</li><li>§ 35 Abs. 1 BauGB</li>` +
       `<li>baugb 34 + baunvo 11</li><li>bund gewässer</li><li>"schädliche Umwelteinwirkungen"</li></ul>` +
@@ -388,14 +382,6 @@ function ParseQuery(Input, Laws) {
         break;
       }
     }
-    // EU-Rechtsakt am Ende ("Art. 4 Abs. 1 RL 2000/60", "Art. 4 der Richtlinie 2000/60/EG")
-    for (let Start = 2; !Done && Start < Parts.length; Start++) {
-      const Eu = ParseEu(Parts.slice(Start));
-      if (Eu && Eu.WordCount === Parts.length - Start) {
-        Text = Parts.slice(Start).join(" ") + " " + Citation[1];
-        Done = true;
-      }
-    }
     const Last = Parts[Parts.length - 1];
     if (!Done && Parts.length > 2 && IsLawName(Last)) {
       // zweiteilig wie "16. BImSchV": vorletztes Teil "16." gehört dazu
@@ -436,18 +422,6 @@ function ParseQuery(Input, Laws) {
         Query.Laws = State.LawKeys.get(Key);
         Tokens = Tokens.slice(Length);
         break;
-      }
-    }
-    // EU-Rechtsakt: "RL 2000/60", "Richtlinie 2000/60/EG", "VO (EG) Nr. 1907/2006"
-    // -> Gesetz der Sammlung mit dieser CELEX-Nummer (z.B. WRRL); nicht in der Sammlung: keine Treffer
-    if (!Query.Laws) {
-      let PlainCount = 0;
-      while (PlainCount < Tokens.length && !Tokens[PlainCount].Phrase) PlainCount++;
-      const Eu = ParseEu(Tokens.slice(0, PlainCount).map(T => T.Text));
-      if (Eu) {
-        Query.Laws = State.EuKeys.get(Eu.Celex) || [];
-        if (Query.Laws.length === 0) Query.UnknownLaw = Eu.Name;
-        Tokens = Tokens.slice(Eu.WordCount);
       }
     }
     // Gesetz, das nicht in der Sammlung ist: "GWB 1", "16. BImSchV 3" (Name, dann Nummer)
@@ -541,45 +515,6 @@ function FindLand(Text) {
   return null;
 }
 
-// EU-Rechtsakt am Anfang der Wörter (wie LawCitation.ParseEu in der Windows-App):
-// "RL 2000/60", "Richtlinie 2000/60/EG", "VO (EG) Nr. 1907/2006", "Beschluss 2011/753"
-// -> { Celex: "32000L0060", Name: "RL 2000/60", WordCount: 2 }; sonst null
-function ParseEu(Words) {
-  if (!Words || Words.length < 2) return null;
-  const Kinds = { rl: ["L", "RL"], richtlinie: ["L", "RL"], vo: ["R", "VO"], verordnung: ["R", "VO"], beschluss: ["D", "Beschluss"] };
-  const Kind = Kinds[Words[0].toLowerCase()];
-  if (!Kind) return null;
-  // "(EU)", "(EG)", "(EWG)" und "Nr." überspringen
-  let Index = 1;
-  while (Index < Words.length && (Words[Index].startsWith("(") || /^nr\.?$/i.test(Words[Index]))) Index++;
-  if (Index >= Words.length) return null;
-  const Celex = EuCelex(Kind[0], Words[Index]);
-  if (!Celex) return null;
-  return { Celex, Name: Kind[1] + " " + EuNumber(Celex), WordCount: Index + 1 };
-}
-
-// CELEX-Nummer aus Art ("L", "R", "D") und Nummer (wie LawNames.EuCelex):
-// "2000/60/EG" (L) -> "32000L0060"; "1907/2006" (R, bis 2014 Nummer/Jahr) -> "32006R1907"; "92/43/EWG" -> "31992L0043"
-function EuCelex(Kind, Number) {
-  const Parts = String(Number).trim().split("/");
-  if (Parts.length < 2 || !/^\d{1,4}$/.test(Parts[0]) || !/^\d{1,4}$/.test(Parts[1])) return "";
-  let Year, Nr;
-  if (Parts[0].length === 4 && +Parts[0] >= 2015) { Year = +Parts[0]; Nr = +Parts[1]; }   // seit 2015 Jahr/Nummer
-  else if (Kind === "R") { Nr = +Parts[0]; Year = +Parts[1]; }                              // Verordnungen bis 2014
-  else { Year = +Parts[0]; Nr = +Parts[1]; }
-  if (Year < 100) Year += Year < 50 ? 2000 : 1900;
-  if (Year < 1950 || Year > 2100 || Nr < 1 || Nr > 9999) return "";
-  return "3" + Year + Kind + String(Nr).padStart(4, "0");
-}
-
-// EU-Nummer aus der CELEX-Nummer (wie LawNames.EuNumber): "32000L0060" -> "2000/60", "32006R1907" -> "1907/2006"
-function EuNumber(Celex) {
-  const Match = /^3(\d{4})([A-Z])(\d{4})/.exec(Celex);
-  if (!Match) return "";
-  const Year = +Match[1], Number = +Match[3];
-  return Match[2] === "R" && Year < 2015 ? Number + "/" + Year : Year + "/" + Number;
-}
-
 // Sieht aus wie eine Gesetzesabkürzung: enthält Buchstaben, keine Satzzeichen außer Punkt/Bindestrich
 function IsLawName(Text) {
   return /[A-Za-zÄÖÜäöüß]/.test(Text) && /^[\wÄÖÜäöüß.\-]+$/.test(Text);
@@ -618,6 +553,13 @@ function ShowResults() {
   // iPad: erste Vorschrift gleich anzeigen; ohne Treffer den Detailbereich leeren
   if (Count === 0) ClearText();
   else if (IsWide()) ShowItem(State.Results[0], false);
+}
+
+// Name der Sammlung aus dem Dateinamen: ".../Schulrecht.json.gz" -> "Schulrecht", "Gesetzessammlung_Web.json.gz" -> "Gesetzessammlung"
+function CollectionNameFrom(FileName) {
+  let Name = decodeURIComponent(String(FileName || "").split(/[\\/]/).pop().split("?")[0]);
+  Name = Name.replace(/\.gz$/i, "").replace(/\.json$/i, "").replace(/_Web$/i, "");
+  return Name;
 }
 
 // Stand der Daten, knapp: "Stand: 7.11.26"
