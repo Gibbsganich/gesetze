@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "38";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "39";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 
 // Zwei Betriebsarten mit denselben Dateien:
 //   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
@@ -21,7 +21,7 @@ const AppVersion = "38";      // wie CacheName in sw.js – wird im Lade-Fenster
 //   Datenbank bei jedem Start ohne Nachfrage von DataUrl laden; nichts wird im Browser gespeichert.
 const LocalMode = location.hostname === "gesetze-app.example" || new URLSearchParams(location.search).has("data");
 const DataUrl = new URLSearchParams(location.search).get("data") ||
-  "https://gesetze-daten.example/Gesetzessammlung_Web.json.gz";
+  "https://gesetze-daten.example/Gesetzessammlung.json.gz";
 const MaxResults = 1000;           // mehr Treffer werden nicht angezeigt (Liste bleibt flüssig)
 
 const State = {
