@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "40";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "41";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 
 // Zwei Betriebsarten mit denselben Dateien:
 //   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
@@ -628,7 +628,7 @@ function ShowResults() {
 }
 
 // Stand der Daten, knapp: "Stand: 7.11.26"
-// Name der Sammlung aus dem Dateinamen: ".../Schulrecht.json.gz" -> "Schulrecht", "Gesetzessammlung_Web.json.gz" -> "Gesetzessammlung"
+// Name der Sammlung aus dem Dateinamen: ".../Schulrecht.json.gz" -> "Schulrecht", "Gesetzessammlung.json.gz" -> "Gesetzessammlung"
 function CollectionNameFrom(FileName) {
   let Name = decodeURIComponent(String(FileName || "").split(/[\\/]/).pop().split("?")[0]);
   Name = Name.replace(/\.gz$/i, "").replace(/\.json$/i, "").replace(/_Web$/i, "");
