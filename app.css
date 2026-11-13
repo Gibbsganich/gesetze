@@ -297,3 +297,6 @@ body:not(.LocalMode) .LocalOnly { display: none; }
 body.LocalMode .WebOnly { display: none; }
 a.BigButton { text-decoration: none; }
 .GoogleButton { margin-top: 24px; max-width: 280px; }
+
+/* Gesuchte Untergliederung ("Abs. 1 Nr. 6 a)"): helleres Gelb; Suchwörter darin bleiben im kräftigen Gelb */
+#LawBody mark.SectionMark { background: #fff9a6; }
