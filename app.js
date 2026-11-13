@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "42";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "43";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 
 // Zwei Betriebsarten mit denselben Dateien:
 //   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
@@ -398,12 +398,20 @@ function ParseQuery(Input, Laws) {
     const After = ParseSection(Text.slice(Citation[0].length));
     if (After.Section.length > 0) CitationSection = After.Section;
     let Done = false;
-    for (const Length of [2, 1]) {
-      const Law = Parts.slice(-Length).join(" ");
-      if (Parts.length > Length && State.LawKeys.has(Law.toLowerCase())) {
-        Text = Law + " " + Citation[1];
-        Done = true;
-        break;
+    // Gesetz der Sammlung nach dem Zitat suchen (erst zwei Wörter, dann eines); was nach dem Gesetz steht,
+    // bleibt als Volltextsuche erhalten: "§ 35 Abs. 1 BauGB umgebung" -> "BauGB 35 umgebung"
+    for (let Start = 1; !Done && Start < Parts.length; Start++) {
+      for (const Length of [2, 1]) {
+        const Law = Parts.slice(Start, Start + Length).join(" ");
+        if (Start + Length <= Parts.length && State.LawKeys.has(Law.toLowerCase())) {
+          // Land direkt nach dem Gesetz ("§ 5 LBO BW") bleibt beim Gesetz
+          const Rest = Parts.slice(Start + Length);
+          const Land = Rest.length > 0 &&
+            State.LawKeys.get(Law.toLowerCase()).some(L => L.Land.toLowerCase() === Rest[0].toLowerCase()) ? [Rest.shift()] : [];
+          Text = [Law].concat(Land, [Citation[1]], Rest).join(" ");
+          Done = true;
+          break;
+        }
       }
     }
     // EU-Rechtsakt am Ende ("Art. 4 Abs. 1 RL 2000/60", "Art. 4 der Richtlinie 2000/60/EG")
