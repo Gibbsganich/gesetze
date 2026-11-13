@@ -13,7 +13,7 @@
 // ======================================================================
 const ColGesetz = 0, ColLand = 1, ColParagraf = 2, ColNummer = 3, ColText = 4, ColHtml = 5;
 const FormatVersion = 1;
-const AppVersion = "41";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
+const AppVersion = "42";      // wie CacheName in sw.js – wird im Lade-Fenster angezeigt
 
 // Zwei Betriebsarten mit denselben Dateien:
 //   Web (GitHub, iPhone/iPad): Datenbank einmal über "Datenbank laden" wählen, auf dem Gerät speichern (IndexedDB).
@@ -33,7 +33,8 @@ const State = {
   CurrentIndex: -1,                // angezeigte Vorschrift
   WholeLaw: false,                 // true = ganzes Gesetz als Fließtext angezeigt
   LawListMode: false,              // true = Liste der Gesetze ("?"): Auswahl zeigt das ganze Gesetz
-  Words: []                        // Suchwörter für die Markierung
+  Words: [],                       // Suchwörter für die Markierung
+  Sections: new Map()              // Index in Texts -> gesuchte Untergliederung ("Abs. 1 Nr. 6 a)") für die Markierung
 };
 
 const El = id => document.getElementById(id);
@@ -332,7 +333,13 @@ function RunSearch() {
   }
   // Oder: Treffer aller Teile zusammenführen (jede Vorschrift einmal, in der Reihenfolge der Sammlung)
   const Found = new Set();
-  for (const Query of Queries) for (const Index of FindTexts(Query)) Found.add(Index);
+  State.Sections = new Map();
+  for (const Query of Queries) {
+    for (const Index of FindTexts(Query)) {
+      Found.add(Index);
+      if (Query.Section) State.Sections.set(Index, Query.Section);
+    }
+  }
   State.Results = [...Found].sort((A, B) => A - B);
   ShowResults();
 }
@@ -383,9 +390,13 @@ function ParseQuery(Input, Laws) {
 
   // Zitat umstellen: "§ 35 Abs. 1 Satz 2 BauGB" -> "BauGB 35"; "§ 1 16. BImSchV" -> "16. BImSchV 1"
   // Auch für Gesetze, die nicht in der Sammlung sind ("§ 1 GWB" -> "GWB 1"); nicht bei "…" (dann Volltext)
+  // Die Untergliederung ("Abs. 1 Nr. 6 a)") wird gemerkt und in der Vorschrift gelb markiert.
   const Citation = Text.match(/^(?:§§?|art\.?|artikel)\s*(\d+[a-z]?)\b/i);
+  let CitationSection = null, CitationOnly = false;
   if (Citation && !Text.includes('"')) {
     const Parts = Text.split(" ");
+    const After = ParseSection(Text.slice(Citation[0].length));
+    if (After.Section.length > 0) CitationSection = After.Section;
     let Done = false;
     for (const Length of [2, 1]) {
       const Law = Parts.slice(-Length).join(" ");
@@ -402,6 +413,12 @@ function ParseQuery(Input, Laws) {
         Text = Parts.slice(Start).join(" ") + " " + Citation[1];
         Done = true;
       }
+    }
+    // Zitat ohne Gesetz ("§ 35 Abs. 1 Nr. 6 a)"): diese Nummer in allen Gesetzen (bzw. im vorgegebenen Gesetz)
+    if (!Done && After.Rest === "") {
+      Text = Citation[1];
+      CitationOnly = true;
+      Done = true;
     }
     const Last = Parts[Parts.length - 1];
     if (!Done && Parts.length > 2 && IsLawName(Last)) {
@@ -488,9 +505,10 @@ function ParseQuery(Input, Laws) {
   }
 
   // Nummer nach dem Gesetz: "35", "3-13", "3a"
-  if (Query.Laws && Plain(1)) {
+  if ((Query.Laws || CitationOnly) && Plain(1)) {
     const First = Tokens[0].Text;
     let Match;
+    Query.ParagraphsOnly = CitationOnly && !Query.Laws;   // ohne Gesetz: nur "§ 35 …"/"Art. 35 …", keine Anlagen
     if ((Match = First.match(/^(\d+)-(\d+)$/))) {
       Query.NumberFrom = +Match[1];
       Query.NumberTo = +Match[2];
@@ -502,11 +520,54 @@ function ParseQuery(Input, Laws) {
       Query.Label = Match[0].toLowerCase();
       Tokens = Tokens.slice(1);
     }
+    // Untergliederung nach der Nummer: "baugb 35 Abs. 1 Nr. 6 a)"
+    if (Query.NumberFrom === Query.NumberTo && Tokens.length > 0) {
+      let PlainCount = 0;
+      while (PlainCount < Tokens.length && !Tokens[PlainCount].Phrase) PlainCount++;
+      const After = ParseSection(Tokens.slice(0, PlainCount).map(T => T.Text).join(" "));
+      if (After.Section.length > 0) {
+        Query.Section = After.Section;
+        Tokens = Tokens.slice(PlainCount - (After.Rest === "" ? 0 : After.Rest.split(" ").length));
+      }
+    }
   }
+  if (CitationSection) Query.Section = CitationSection;
 
   // Rest: Wörter und Phrasen (Platzhalter * wird ignoriert)
   Query.Words = Tokens.map(T => T.Text.replace(/\*/g, "")).filter(T => T !== "");
   return Query;
+}
+
+// Untergliederung am Anfang von Text lesen: "Abs. 1 Satz 2 Nr. 6 a)" -> Section = [{ Kind: "Abs", Value: "1" }, …]
+// Kind: Abs, Satz, Nr, Lit (Buchstabe). Rest = was danach noch im Text steht (z.B. das Gesetz).
+function ParseSection(Text) {
+  const Kinds = [
+    ["Abs", /^abs(?:atz)?\.?\s*(\d+[a-z]?)(?![\wäöüß])/i],
+    ["Satz", /^(?:satz|s\.)\s*(\d+)(?![\wäöüß])/i],
+    ["Nr", /^(?:nr\.?|nummer|ziff(?:er)?\.?)\s*(\d+[a-z]?)(?![\wäöüß])\.?/i],
+    ["Lit", /^(?:buchst(?:abe)?\.?|lit\.?|ziff(?:er)?\.?)\s*([a-z]{1,4})(?![\wäöüß])\)?/i],
+    ["Lit", /^([a-z]{1,4})\)/i],                                    // "a)", "aa)"
+    ["", /^(?:hs\.?|halbs(?:atz)?\.?|alt\.?|alternative|var\.?|variante|uabs\.?|unterabs(?:atz)?\.?)\s*\d+(?![\wäöüß])/i]
+  ];
+  const Section = [];
+  let Rest = Text;
+  for (;;) {
+    Rest = Rest.replace(/^[\s,]+/, "");
+    let Match = null, Kind = "";
+    for (const [Name, Pattern] of Kinds) {
+      if ((Match = Rest.match(Pattern))) { Kind = Name; break; }
+    }
+    // Buchstabe ohne Klammer direkt nach der Nummer: "Nr. 6 a"
+    if (!Match && Section.length > 0 && Section[Section.length - 1].Kind === "Nr" &&
+        (Match = Rest.match(/^([a-z])(?=\s|$)/i))) Kind = "Lit";
+    // Doppelbuchstabe ohne Klammer nach dem Buchstaben: "Buchst. b bb"
+    if (!Match && Section.length > 0 && Section[Section.length - 1].Kind === "Lit" &&
+        (Match = Rest.match(/^(([a-z])\2)(?=\s|$)/i))) Kind = "Lit";
+    if (!Match) break;
+    if (Kind) Section.push({ Kind: Kind, Value: Match[1].toLowerCase() });   // Halbsatz, Alternative usw.: überlesen
+    Rest = Rest.slice(Match[0].length);
+  }
+  return { Section: Section, Rest: Rest.trim() };
 }
 
 // Treffer suchen: Indizes der passenden Zeilen
@@ -520,6 +581,7 @@ function FindTexts(Query) {
     if (Query.Land && Row[ColLand] !== Query.Land) return;
     if (Query.NumberFrom !== null && (Row[ColNummer] < Query.NumberFrom || Row[ColNummer] > Query.NumberTo)) return;
     if (LabelPattern && !LabelPattern.test(Row[ColParagraf])) return;
+    if (Query.ParagraphsOnly && !/^(§|Art)/.test(Row[ColParagraf])) return;
     for (const Pattern of Patterns) {
       if (!Pattern.test(Row[ColText]) && !Pattern.test(Row[ColParagraf])) return;
     }
@@ -762,7 +824,11 @@ function ShowText(Index, OpenDetail) {
   El("DetailLaw").textContent = `${Row[ColGesetz]} · ${Row[ColLand]}`;
   El("LawBody").innerHTML = ResolveImages(Row[ColHtml]);
   CheckImages(El("LawBody"));
-  const FirstMark = Highlight(El("LawBody"), State.Words);
+  // gesuchte Untergliederung ("Abs. 1 Nr. 6 a)") und Suchwörter gelb markieren
+  const Section = State.Sections.get(Index);
+  const SectionMark = Section ? HighlightSection(El("LawBody"), Section) : null;
+  const FirstMark = SectionMark || Highlight(El("LawBody"), State.Words);
+  if (SectionMark) Highlight(El("LawBody"), State.Words);
 
   El("PreviousButton").disabled = !(Index > 0 && SameLaw(Index - 1, Index));
   El("NextButton").disabled = !(Index < State.Texts.length - 1 && SameLaw(Index + 1, Index));
@@ -923,6 +989,139 @@ function Highlight(Root, Words) {
     }
     Fragment.appendChild(document.createTextNode(Text.slice(Last)));
     Node.parentNode.replaceChild(Fragment, Node);
+  }
+  return First;
+}
+
+// ======================================================================
+// Untergliederung markieren: "§ 35 Abs. 1 Nr. 6 a) BauGB" -> Buchstabe a gelb
+//   Aufbau des Textes: verschachtelte Listen; jedes <li> beginnt mit seinem Zeichen in <span>: (1), 6., a)
+//   Schritt für Schritt wird der passende Listenpunkt gesucht; markiert wird der letzte gefundene.
+//   "Satz 2" am Ende: nur dieser Satz. Rückgabe: erste Markierung (oder null, wenn nichts gefunden)
+// ======================================================================
+function HighlightSection(Root, Section) {
+  let Scope = Root, Sentence = 0;
+  for (const Step of Section) {
+    if (Step.Kind === "Satz") { Sentence = +Step.Value; continue; }
+    const Item = FindItem(Scope, Step);
+    if (!Item) break;
+    Scope = Item;
+    Sentence = 0;
+  }
+  if (Sentence > 0) {
+    const Mark = MarkSentence(Scope, Sentence);
+    if (Mark) return Mark;
+  }
+  return Scope === Root ? null : MarkRange(TextPieces(Scope, false), 0, Infinity);
+}
+
+// Listenpunkt mit dem Zeichen des Schritts suchen: Abs. 1 -> "(1)", Nr. 6 -> "6.", Buchstabe a -> "a)"
+function FindItem(Scope, Step) {
+  const V = Step.Value;
+  const Markers = Step.Kind === "Abs" ? [`(${V})`] : Step.Kind === "Nr" ? [`${V}.`, `${V})`] : [`${V})`, `${V}.`, `(${V})`];
+  for (const Item of Scope.querySelectorAll("li")) {
+    const Marker = ItemMarker(Item);
+    if (Marker && Markers.includes(Marker.textContent.replace(/\s/g, "").toLowerCase())) return Item;
+  }
+  return null;
+}
+
+// Das Zeichen eines Listenpunkts: <span> als erstes Kind von <li>
+function ItemMarker(Item) {
+  const First = Item.firstChild;
+  return First && First.nodeName === "SPAN" ? First : null;
+}
+
+// Textstücke eines Bereichs in Lesereihenfolge mit ihrer Position im zusammengesetzten Text.
+// Zeichen der Listenpunkte (und hochgestellte Satznummern) zählen nicht zum Text (Length 0),
+// damit "1." vor einem Listenpunkt nicht wie ein Satzende aussieht. SkipOwnMarker: eigenes Zeichen "(1)" weglassen.
+function TextPieces(Scope, SkipOwnMarker) {
+  const Walker = document.createTreeWalker(Scope, NodeFilter.SHOW_TEXT);
+  const Pieces = [];
+  let Position = 0, Joined = "";
+  while (Walker.nextNode()) {
+    const Node = Walker.currentNode, Parent = Node.parentNode;
+    const IsMarker = Parent.nodeName === "SPAN" && Parent.parentNode.nodeName === "LI" && ItemMarker(Parent.parentNode) === Parent;
+    if (IsMarker && SkipOwnMarker && Parent.parentNode === Scope) continue;
+    const IsNumber = Parent.nodeName === "SUP" && /^\d+$/.test(Node.nodeValue.trim()) && !/[\wäöüß²³]$/i.test(Joined);
+    // Textstücke aus verschiedenen Absätzen/Listenpunkten durch ein Leerzeichen trennen
+    if (Joined !== "" && !/\s$/.test(Joined) && !IsMarker && !IsNumber) { Joined += " "; Position++; }
+    const Length = IsMarker || IsNumber ? 0 : Node.nodeValue.length;
+    Pieces.push({ Node: Node, Start: Position, Length: Length, Number: IsNumber ? +Node.nodeValue : 0 });
+    if (Length > 0) { Joined += Node.nodeValue; Position += Length; }
+  }
+  Pieces.Joined = Joined;
+  return Pieces;
+}
+
+// Einen Satz markieren. Mit hochgestellten Satznummern (Landesrecht): von Nummer n bis zur nächsten Nummer.
+// Sonst werden die Satzenden gesucht: Punkt, Leerraum, Großbuchstabe – außer nach Abkürzungen und Ordnungszahlen.
+function MarkSentence(Scope, Number) {
+  const Pieces = TextPieces(Scope, true);
+  const Numbers = Pieces.filter(P => P.Number > 0);
+  if (Numbers.length > 0) {
+    const Index = Numbers.findIndex(P => P.Number === Number);
+    if (Index < 0 && Number !== 1) return null;
+    const From = Index < 0 ? 0 : Numbers[Index].Start;
+    const Next = Numbers[Index + 1];
+    return MarkRange(Pieces, From, Next ? Next.Start : Infinity, Index < 0 ? null : Numbers[Index].Node);
+  }
+  const Starts = SentenceStarts(Pieces.Joined);
+  if (Number > Starts.length) return null;
+  return MarkRange(Pieces, Starts[Number - 1], Number < Starts.length ? Starts[Number] : Infinity);
+}
+
+// Anfangspositionen der Sätze in einem Text
+function SentenceStarts(Text) {
+  const Abbreviations = new Set(["abs", "nr", "nrn", "art", "s", "vgl", "bzw", "ggf", "buchst", "lit", "ziff", "bgbl", "gbl", "gvbl",
+    "sog", "einschl", "evtl", "ca", "max", "min", "dr", "prof", "st", "str", "abschn", "anh", "anl", "kap", "tz", "rn", "f", "ff",
+    "gem", "inkl", "zzgl", "bzgl", "insb", "u", "a", "o", "ä", "z", "b", "d", "h", "i", "v", "m", "e", "g"]);
+  const References = /(?:§|abs\.|absatz|absätze[ns]?|satz|sätze[ns]?|nr\.|nummer|nummern|artikel|art\.|anlage|anhang|bis|und|oder)\s+$/i;
+  const Months = /^(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\b/;
+  const Starts = [0];
+  const Pattern = /([.!?])["“”)]*\s+(?=[A-ZÄÖÜ„"(§])/g;
+  let Match;
+  while ((Match = Pattern.exec(Text))) {
+    const Next = Match.index + Match[0].length;
+    if (Match[1] === ".") {
+      const Before = Text.slice(0, Match.index);
+      const Word = (Before.match(/([\wäöüÄÖÜß]+)$/) || ["", ""])[1];
+      if (Abbreviations.has(Word.toLowerCase())) continue;
+      if (/^\d{1,2}$/.test(Word)) {
+        // "15. März", "die 16. Verordnung": kein Satzende; "nach Absatz 1. Die": Satzende
+        if (Months.test(Text.slice(Next)) || !References.test(Before.slice(0, Before.length - Word.length))) continue;
+      }
+    }
+    Starts.push(Next);
+  }
+  return Starts;
+}
+
+// Textstücke zwischen den Positionen From und To gelb markieren; Rückgabe: erste Markierung
+// Extra: Textstück, das zusätzlich markiert wird (hochgestellte Satznummer am Anfang)
+function MarkRange(Pieces, From, To, Extra) {
+  let First = null;
+  for (const Piece of Pieces) {
+    const Text = Piece.Node.nodeValue;
+    let A = 0, B = Text.length;
+    if (Piece.Length === 0) {
+      if (Piece.Node !== Extra && !(Piece.Start >= From && Piece.Start < To && (Piece.Start > From || From === 0))) continue;
+    } else {
+      A = Math.max(From - Piece.Start, 0);
+      B = Math.min(To - Piece.Start, Text.length);
+      // Leerraum am Ende des Satzes nicht markieren
+      while (B > A && /\s/.test(Text[B - 1])) B--;
+      if (B <= A) continue;
+    }
+    if (Text.trim() === "") continue;
+    const Mark = document.createElement("mark");
+    Mark.textContent = Text.slice(A, B);
+    const Fragment = document.createDocumentFragment();
+    Fragment.appendChild(document.createTextNode(Text.slice(0, A)));
+    Fragment.appendChild(Mark);
+    Fragment.appendChild(document.createTextNode(Text.slice(B)));
+    Piece.Node.parentNode.replaceChild(Fragment, Piece.Node);
+    if (!First) First = Mark;
   }
   return First;
 }
